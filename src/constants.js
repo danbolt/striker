@@ -1,0 +1,27 @@
+const GAME_WIDTH = 820;
+const GAME_HEIGHT = 480;
+const PLAYER_MOVE_CUTOFF = 8;
+
+const PLAYER_MOVE_SPEED = 155.47;
+
+const PLAYER_BULLET_SIZE = 8;
+const PLAYER_BULLET_SPEED = 410;
+const PLAYER_SHOT_DELAY_MS = 100;
+const PLAYER_BULLET_POOL_SIZE = 48;
+
+const ENEMY_POOL_SIZE = 64;
+const ENEMY_BULLET_POOL_SIZE = 1024;
+
+// TODO: data driven for player
+const PLAYER_MAX_HEALTH = 10;
+const BULLET_DAMAGE = 3;
+
+// TODO: data driven per enemy
+const ENEMY_MAX_HEALTH = 10;
+const ENEMY_COLLIDE_DAMAGE = 2;
+const ENEMY_BULLET_DAMAGE = 1;
+const ENEMY_BULLET_PERIOD_MS = 500;
+const ENEMY_BULLET_SPEED = 300;
+
+const BULLET_NAME_KEY = 'bullet';
+const ENEMY_NAME_KEY = 'enemy';
