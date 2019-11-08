@@ -17,11 +17,12 @@ const PLAYER_MAX_HEALTH = 10;
 const BULLET_DAMAGE = 3;
 
 // TODO: data driven per enemy
-const ENEMY_MAX_HEALTH = 10;
+const ENEMY_MAX_HEALTH = 22;
 const ENEMY_COLLIDE_DAMAGE = 2;
 const ENEMY_BULLET_DAMAGE = 1;
-const ENEMY_BULLET_PERIOD_MS = 500;
+const ENEMY_BULLET_PERIOD_MS = 750;
 const ENEMY_BULLET_SPEED = 300;
+const ENEMY_MOVE_SPEED = 180;
 
 const BULLET_NAME_KEY = 'bullet';
 const ENEMY_NAME_KEY = 'enemy';

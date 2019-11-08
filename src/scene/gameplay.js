@@ -99,6 +99,7 @@ Gameplay.prototype.setupEvents = function () {
 Gameplay.prototype.removeEvents = function () {
     //this.events.removeListener('update', this.player.update, this.player);
 };
+
 Gameplay.prototype.create = function () {
     this.uiScene = this.scene.get('InGameUI');
     this.setupEvents();
@@ -120,16 +121,21 @@ Gameplay.prototype.create = function () {
     for (var i = 0; i < ENEMY_POOL_SIZE; i++) {
         let enemy = this.add.sprite(-9999, -99999, 'test_sheet', 13);
         this.physics.add.existing(enemy);
+        enemy.body.moves = false;
         enemy.tint = 0xFF6666;
         enemy.health = ENEMY_MAX_HEALTH;
         enemy.name = BULLET_NAME_KEY;
         enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
+        enemy.path = testPathA;
+        enemy.startOffset = new Phaser.Math.Vector2(0, 0);
+        enemy.pathPos = 0;
+        enemy.entering = false;
         this.enemies.add(enemy);
         this.enemies.killAndHide(enemy);
     }
 
     // some test enemies
-    for (var i = 0; i < 5; i++) {
+    this.time.addEvent({ delay: 1000, callback: () => {
         let newEnemy = this.enemies.getFirstDead();
         if (newEnemy === null) {
             console.warn('Unable to get an enemy? Is the pool too small?');
@@ -139,9 +145,12 @@ Gameplay.prototype.create = function () {
         newEnemy.y = 70 + (Math.sin(i / 5 * Math.PI * 2) * 16);
         newEnemy.setActive(true);
         newEnemy.setVisible(true);
-        newEnemy.body.velocity.x = 0;
-        newEnemy.body.velocity.y = 0;
-    }
+        newEnemy.path = testPathA;
+        newEnemy.pathPos = 0;
+        newEnemy.startOffset.x = 0;
+        newEnemy.startOffset.y = 0;
+        newEnemy.entering = true;
+    }, loop: true });
 
 
     // Initialize bullets
@@ -220,6 +229,13 @@ Gameplay.prototype.create = function () {
 
 };
 
+
+let pathPointCache = new Phaser.Math.Vector2(0, 0);
+let testPathA = new Phaser.Curves.Path(GAME_WIDTH, GAME_HEIGHT * 0.1);
+testPathA.lineTo(GAME_WIDTH * 0.75, GAME_HEIGHT * 0.25)
+testPathA.ellipseTo(GAME_WIDTH * 0.25, 100, 0, 180, true, 0);
+testPathA.lineTo(0, GAME_HEIGHT * 0.1);
+testPathA.lineTo(-700, 0);
 
 Gameplay.prototype.update = function () {
 
@@ -355,6 +371,26 @@ Gameplay.prototype.update = function () {
             enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
             spawnEnemyBullet(enemy, Math.PI * 0.5, ENEMY_BULLET_SPEED);
         }
+
+        // TODO: de-hack path timing per tick
+        const sixtyFramesPerSecond = 0.016;
+        const length = enemy.path.getLength();
+        const pathVeloRatio = ENEMY_MOVE_SPEED / length * sixtyFramesPerSecond;
+        enemy.pathPos += pathVeloRatio;
+        enemy.path.getPoint(enemy.pathPos, pathPointCache);
+        enemy.x = pathPointCache.x + enemy.startOffset.x;
+        enemy.y = pathPointCache.y + enemy.startOffset.y;
+
+        const inWorld = this.cameras.cameras[0].worldView.contains(enemy.x, enemy.y);
+        if ((enemy.entering === false) && (inWorld === false)) {
+            enemy.x = -999999;
+            enemy.y = -999999;
+            this.enemies.killAndHide(enemy);
+            return;
+        }
+        if ((inWorld === true) && (enemy.entering === true)) {
+            enemy.entering = false;
+        }
     };
     this.enemies.children.iterate(enemyIter);
 
@@ -364,7 +400,7 @@ Gameplay.prototype.update = function () {
     //    mixer.update(sixtyFramesPerSecond);
     //})
     this.updateThreeScene();
-
+    this.uiScene.refreshUI(this.playerHealth);
     
 };
 Gameplay.prototype.shutdown = function () {
