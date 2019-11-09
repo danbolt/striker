@@ -18,7 +18,7 @@ let Gameplay = function (config) {
     this.enemyBullets = null;
 
     this.three = null;
-    this.camera = new THREE.PerspectiveCamera( 70, GAME_WIDTH / GAME_HEIGHT, 1, 500 );
+    this.camera = new THREE.PerspectiveCamera( 75, GAME_WIDTH / GAME_HEIGHT, 1, 700 );
     this.renderer = null;
     this.threeScene = new THREE.Scene();
     this.sceneMeshData = {};
@@ -72,26 +72,30 @@ Gameplay.prototype.initializeThreeScene = function () {
     let l = new THREE.AmbientLight(0xFFFFFF);
     this.threeScene.add(l);
 
-    let cubeGeom = new THREE.BoxBufferGeometry( 1, 1, 1 );
-    let cubeMat = new THREE.MeshBasicMaterial( { color: 0x003330 } );
-    let cubeMesh = new THREE.Mesh( cubeGeom, cubeMat );
-    this.threeScene.add(cubeMesh);
 
-    this.camera.position.set(0, 1, 0);
-    this.camera.lookAt(0, 0, 0);
+    let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 2, 2 );
+    let fieldMat = new THREE.MeshBasicMaterial( { color: 0x00FF00 } );
+    let fieldMesh = new THREE.Mesh( fieldGeom, fieldMat );
+    fieldMesh.position.set(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
+    fieldMesh.rotation.x = Math.PI * -0.5;
+    this.threeScene.add(fieldMesh);
+
+    let cubeGeom = new THREE.BoxBufferGeometry( 16, 16, 16 );
+    let cubeMat = new THREE.MeshBasicMaterial( { color: 0x003330 } );
+    let playerMesh = new THREE.Mesh( cubeGeom, cubeMat );
+    this.threeScene.add(playerMesh);
+    this.sceneMeshData['player'] = playerMesh;
+
+    this.camera.position.set(GAME_WIDTH * 0.5, 32, GAME_HEIGHT * 0.5);
+    this.camera.lookAt(64, 0, 64);
 };
 
-// TODO: remove this
-let rRot = 0;
 
 Gameplay.prototype.updateThreeScene = function () {
-    // TODO: REMOVE THIS
-    const DEBUG_SIXTY = 0.016;
-    rRot += DEBUG_SIXTY;
+    this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
 
-    const dist = 5;
-    this.camera.position.set(Math.sin(rRot) * dist, 1, Math.cos(rRot) * dist);
-    this.camera.lookAt(0, 0, 0);
+    this.camera.position.set(GAME_WIDTH * 0.5, 300, GAME_HEIGHT * 0.5 + 300);
+    this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
 };
 Gameplay.prototype.setupEvents = function () {
     //this.events.addListener('update', this.player.update, this.player);
@@ -399,7 +403,6 @@ Gameplay.prototype.update = function () {
     //    const sixtyFramesPerSecond = 0.016;
     //    mixer.update(sixtyFramesPerSecond);
     //})
-    this.updateThreeScene();
     this.uiScene.refreshUI(this.playerHealth);
     
 };
