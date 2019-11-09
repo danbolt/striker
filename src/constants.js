@@ -1,4 +1,4 @@
-const GAME_WIDTH = 820;
+const GAME_WIDTH = 640;
 const GAME_HEIGHT = 480;
 const PLAYER_MOVE_CUTOFF = 8;
 
