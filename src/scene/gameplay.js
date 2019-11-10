@@ -27,6 +27,11 @@ let Gameplay = function (config) {
 
     this.formationData = {};
 
+    const DEFAULT_WORLD_SIZE = 1000;
+    this.worldSize = new Phaser.Math.Vector2(DEFAULT_WORLD_SIZE, DEFAULT_WORLD_SIZE);
+    this.playerPosition = new Phaser.Math.Vector2(0, 0);
+    this.squads = [];
+
     this.uiScene = null;
 
 };
@@ -112,6 +117,8 @@ Gameplay.prototype.removeEvents = function () {
 };
 
 Gameplay.prototype.initializePlayer = function () {
+    this.playerPosition = new Phaser.Math.Vector2(this.worldSize.x * 0.5, this.worldSize.y * 0.5);
+
     this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.canShoot = true;
@@ -226,7 +233,7 @@ Gameplay.prototype.initializeCollisions = function () {
             this.player.setVisible(false);
         }
 
-        this.uiScene.refreshUI(this.playerHealth);
+        this.uiScene.refreshUI(this.playerHealth, this.score);
     }, (player, enemyBullet) => { return (this.player.dodging == false); });
 
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
@@ -241,7 +248,7 @@ Gameplay.prototype.initializeCollisions = function () {
             this.player.setVisible(false);
         }
 
-        this.uiScene.refreshUI(this.playerHealth);
+        this.uiScene.refreshUI(this.playerHealth, this.score);
     }, (player, enemy) => { return (this.player.dodging == false); });
 };
 
@@ -253,6 +260,31 @@ Gameplay.prototype.create = function () {
     this.initializeThreeScene();
 
     this.score = 0;
+    this.squads = [];
+
+    // some dummy squads
+    this.squads = [
+        {
+            "formation": "sample_a",
+            "x": Math.random() * this.worldSize.x,
+            "y": Math.random() * this.worldSize.y
+        },
+        {
+            "formation": "sample_b",
+            "x": Math.random() * this.worldSize.x,
+            "y": Math.random() * this.worldSize.y
+        },
+        {
+            "formation": "sample_c",
+            "x": Math.random() * this.worldSize.x,
+            "y": Math.random() * this.worldSize.y
+        },
+        {
+            "formation": "sample_d",
+            "x": Math.random() * this.worldSize.x,
+            "y": Math.random() * this.worldSize.y
+        }
+    ]
 
     this.formationData = {};
     let formData = this.cache.json.get('formations');
@@ -495,7 +527,11 @@ Gameplay.prototype.update = function () {
     //    const sixtyFramesPerSecond = 0.016;
     //    mixer.update(sixtyFramesPerSecond);
     //})
-    this.uiScene.refreshUI(this.playerHealth);
+    //this.uiScene.refreshUI(this.playerHealth, this.score);
+
+    this.playerPosition.x += 0.1
+    this.playerPosition.y += 0.1
+    this.uiScene.refreshMap(this.worldSize, this.playerPosition, this.squads);
     
 };
 Gameplay.prototype.shutdown = function () {
