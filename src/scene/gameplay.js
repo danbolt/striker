@@ -77,7 +77,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
 
     let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 2, 2 );
-    let fieldMat = new THREE.MeshBasicMaterial( { color: 0x00FF00 } );
+    let fieldMat = new THREE.MeshBasicMaterial( { color: 0x005555 } );
     let fieldMesh = new THREE.Mesh( fieldGeom, fieldMat );
     fieldMesh.position.set(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
     fieldMesh.rotation.x = Math.PI * -0.5;
@@ -98,29 +98,19 @@ Gameplay.prototype.updateThreeScene = function () {
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
 };
 Gameplay.prototype.setupEvents = function () {
-    //this.events.addListener('update', this.player.update, this.player);
 };
 Gameplay.prototype.removeEvents = function () {
-    //this.events.removeListener('update', this.player.update, this.player);
 };
 
-Gameplay.prototype.create = function () {
-    this.uiScene = this.scene.get('InGameUI');
-    this.setupEvents();
-
-    this.setupThreeBackground();
-    this.initializeThreeScene();
-
-    this.score = 0;
-
+Gameplay.prototype.initializePlayer = function () {
     this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.canShoot = true;
     this.physics.add.existing(this.player);
     this.player.body.setSize(8, 8, true);
     this.time.addEvent({ delay: PLAYER_SHOT_DELAY_MS, callback: () => { this.canShoot = true; }, callbackScope: this, loop: true });
-
-    // Initialize enemies
+};
+Gameplay.prototype.initializeEnemies = function() {
     this.enemies = this.add.group();
     for (var i = 0; i < ENEMY_POOL_SIZE; i++) {
         let enemy = this.add.sprite(-9999, -99999, 'test_sheet', 13);
@@ -155,9 +145,8 @@ Gameplay.prototype.create = function () {
         newEnemy.startOffset.y = 0;
         newEnemy.entering = true;
     }, loop: true });
-
-
-    // Initialize bullets
+};
+Gameplay.prototype.initialzeBullets = function () {
     this.playerBullets = this.add.group();
     for (var i = 0; i < PLAYER_BULLET_POOL_SIZE; i++) {
         let bullet = this.add.sprite(-9999, -99999, 'test_sheet', 21);
@@ -180,11 +169,8 @@ Gameplay.prototype.create = function () {
         this.enemyBullets.add(bullet);
         this.enemyBullets.killAndHide(bullet);
     }
-
-
-    // Collision stuff
-
-    
+};
+Gameplay.prototype.initializeCollisions = function () {
     this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => {
         // on overlap
         enemy.health -= BULLET_DAMAGE;
@@ -198,7 +184,6 @@ Gameplay.prototype.create = function () {
         bullet.x = -9999;
         bullet.y = -9999;
     });
-
 
     this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
         
@@ -229,6 +214,21 @@ Gameplay.prototype.create = function () {
 
         this.uiScene.refreshUI(this.playerHealth);
     });
+};
+
+Gameplay.prototype.create = function () {
+    this.uiScene = this.scene.get('InGameUI');
+    this.setupEvents();
+
+    this.setupThreeBackground();
+    this.initializeThreeScene();
+
+    this.score = 0;
+
+    this.initializePlayer();
+    this.initializeEnemies();
+    this.initialzeBullets();
+    this.initializeCollisions();
     
     let sceneShader = this.add.shader('film_grain', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
 
