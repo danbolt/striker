@@ -99,7 +99,8 @@ Gameplay.prototype.initializeThreeScene = function () {
 
 
 Gameplay.prototype.updateThreeScene = function () {
-    this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
+    const TEST_JUMP_HEIGHT = 25;
+    this.sceneMeshData['player'].position.set(this.player.x, TEST_JUMP_HEIGHT * Math.sin(Math.abs(this.player.rotation) * 0.5), this.player.y);
     this.sceneMeshData['player'].rotation.set(0, 0, this.player.rotation);
 
     this.camera.position.set(GAME_WIDTH * 0.5, 350, GAME_HEIGHT * 0.5 + 25);
@@ -139,28 +140,40 @@ Gameplay.prototype.initializeEnemies = function() {
     }
 
     // some test enemies
-    this.time.addEvent({ delay: 1000, callback: () => {
-        let newEnemy = this.enemies.getFirstDead();
-        if (newEnemy === null) {
-            console.warn('Unable to get an enemy? Is the pool too small?');
-            return;
-        }
-        newEnemy.x = 64 + 128 * i;
-        newEnemy.y = 70 + (Math.sin(i / 5 * Math.PI * 2) * 16);
-        newEnemy.setActive(true);
-        newEnemy.setVisible(true);
-        newEnemy.path = this.formationData[Math.random() < 0.5 ? 'sample_d' : 'sample_a'].curve;
-        newEnemy.pathPos = 0;
-        newEnemy.startOffset.x = 0;
-        newEnemy.startOffset.y = 0;
-        newEnemy.entering = true;
-    }, loop: true });
+    this.deployFormation('sample_c', 500);
+    this.deployFormation('sample_d', 2500);
 };
 
+Gameplay.prototype.deployFormation = function(formationKey, deployDelay) {
+    const formation = this.formationData[formationKey];
+    if (formation === undefined) {
+        console.warn('Could not find/deploy ' + formationKey + ' does it exist?');
+        return;
+    }
 
+    deployDelay = (deployDelay === undefined) ? 0 : deployDelay;
+    for (let i = 0; i < formation.ships.length; i++) {
+        this.time.addEvent({ delay: (deployDelay + (i * formation.deploy_rate)), callback: () => {
+            const shipType = formation.ships[i];
+            // TODO: Depends on ship type
 
-Gameplay.prototype.deployFormation = function(formation) {
-    //
+            let newEnemy = this.enemies.getFirstDead();
+            if (newEnemy === null) {
+                console.warn('Unable to get an enemy! Is the pool too small?');
+                return;
+            }
+            newEnemy.x = formation.path[0];
+            newEnemy.y = formation.path[1];
+            newEnemy.setActive(true);
+            newEnemy.setVisible(true);
+            newEnemy.path = formation.curve;
+            newEnemy.pathPos = 0;
+            newEnemy.startOffset.x = formation.offset_per_deploy.x * i;
+            newEnemy.startOffset.y = formation.offset_per_deploy.y * i;
+            newEnemy.entering = true;
+        }, loop: false });
+    };
+
 };
 Gameplay.prototype.initialzeBullets = function () {
     this.playerBullets = this.add.group();
@@ -199,7 +212,7 @@ Gameplay.prototype.initializeCollisions = function () {
         this.playerBullets.killAndHide(bullet);
         bullet.x = -9999;
         bullet.y = -9999;
-    });
+    }, (bullet, enemy) => { return enemy.active; });
 
     this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
         
@@ -459,6 +472,7 @@ Gameplay.prototype.update = function () {
         const length = enemy.path.getLength();
         const pathVeloRatio = ENEMY_MOVE_SPEED / length * sixtyFramesPerSecond;
         enemy.pathPos += pathVeloRatio;
+        enemy.pathPos = Math.min(1, enemy.pathPos);
         enemy.path.getPoint(enemy.pathPos, pathPointCache);
         enemy.x = pathPointCache.x + enemy.startOffset.x;
         enemy.y = pathPointCache.y + enemy.startOffset.y;

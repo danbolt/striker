@@ -25,15 +25,15 @@
 		"move_speed": 400
 	},
 	"sample_c": {
-		"path": [640, 0, 500, 64],
+		"path": [840, 0, 640, 0, 500, 64],
 		"ships": [
 			"basic",
 			"basic",
 			"basic"
 		],
-		"offset_per_deploy": { "x": 0, "y": 64},
-		"deploy_rate": 1223, 
-		"move_speed": 200
+		"offset_per_deploy": { "x": -64, "y": 64},
+		"deploy_rate": 250, 
+		"move_speed": 700
 	},
 	"sample_d": {
 		"path": [
@@ -51,8 +51,8 @@
 			"basic",
 			"basic"
 		],
-		"offset_per_deploy": { "x": 0, "y": 0},
-		"deploy_rate": 700, 
+		"offset_per_deploy": { "x": 0, "y": -8},
+		"deploy_rate": 440, 
 		"move_speed": 200
 	}
 }
