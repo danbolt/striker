@@ -292,9 +292,24 @@ Gameplay.prototype.update = function () {
         if (this.input.gamepad && (this.input.gamepad.total > 0)) {
             var pad = this.input.gamepad.getPad(0);
 
-            if (pad.leftStick.lengthSq() > 0.001) {
+            if (pad.leftStick.lengthSq() > 0.1) {
               this.player.body.velocity.x = pad.leftStick.x * moveSpeed;
               this.player.body.velocity.y = pad.leftStick.y * moveSpeed;
+            } else {
+                if (pad.right) {
+                    this.player.body.velocity.x = moveSpeed;
+                } else if (pad.left) {
+                    this.player.body.velocity.x = -moveSpeed;
+                } else {
+                    this.player.body.velocity.x = 0;
+                }
+                if (pad.down) {
+                    this.player.body.velocity.y = moveSpeed;
+                } else if (pad.up) {
+                    this.player.body.velocity.y = -moveSpeed;
+                } else {
+                    this.player.body.velocity.y = 0;
+                }
             }
         }
 
@@ -311,7 +326,7 @@ Gameplay.prototype.update = function () {
         }
         if (this.input.gamepad && (this.input.gamepad.total > 0)) {
             var pad = this.input.gamepad.getPad(0);
-            if (pad.rightStick.lengthSq() > 0.001) {
+            if (pad.rightStick.lengthSq() > 0.1) {
               this.playerAimDir.x = pad.rightStick.x;
               this.playerAimDir.y = pad.rightStick.y;
             }
@@ -324,7 +339,7 @@ Gameplay.prototype.update = function () {
                 spawnBullet();
                 this.canShoot = false;
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && this.input.gamepad.getPad(0).R2) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).R2 || this.input.gamepad.getPad(0).R1)) {
                 shoot();
             } else if (this.keys.aKey.isDown) {
                 shoot();
@@ -350,7 +365,7 @@ Gameplay.prototype.update = function () {
 
                 this.add.tween({ targets: this.player, duration: PLAYER_DODGE_TIME_MS, rotation: (Math.PI * 2 * tweenPivotDir), onComplete: () => { this.player.rotation = 0; } })
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && this.input.gamepad.getPad(0).A) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).A || this.input.gamepad.getPad(0).L1)) {
                 dodge();
             } else if (this.keys.bKey.isDown) {
                 dodge();
