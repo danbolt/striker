@@ -29,3 +29,13 @@ const ENEMY_MOVE_SPEED = 180;
 
 const BULLET_NAME_KEY = 'bullet';
 const ENEMY_NAME_KEY = 'enemy';
+
+
+const FORMATIONS = {
+  "SAMPLE_A": {
+    //
+  },
+  "SAMPLE_B": {
+    //
+  },
+};

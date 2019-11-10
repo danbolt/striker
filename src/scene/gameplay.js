@@ -25,6 +25,8 @@ let Gameplay = function (config) {
     this.sceneMeshData = {};
     this.mixers = [];
 
+    this.formationData = {};
+
     this.uiScene = null;
 
 };
@@ -53,6 +55,8 @@ Gameplay.prototype.preload = function () {
     this.load.image('test_sheet_image', 'asset/image/fromJesse.png');
 
     this.load.glsl('film_grain', 'asset/shader/film_grain.frag');
+
+    this.load.json('formations', 'asset/formation/formations.json');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -145,12 +149,18 @@ Gameplay.prototype.initializeEnemies = function() {
         newEnemy.y = 70 + (Math.sin(i / 5 * Math.PI * 2) * 16);
         newEnemy.setActive(true);
         newEnemy.setVisible(true);
-        newEnemy.path = testPathA;
+        newEnemy.path = this.formationData[Math.random() < 0.5 ? 'sample_d' : 'sample_a'].curve;
         newEnemy.pathPos = 0;
         newEnemy.startOffset.x = 0;
         newEnemy.startOffset.y = 0;
         newEnemy.entering = true;
     }, loop: true });
+};
+
+
+
+Gameplay.prototype.deployFormation = function(formation) {
+    //
 };
 Gameplay.prototype.initialzeBullets = function () {
     this.playerBullets = this.add.group();
@@ -231,14 +241,32 @@ Gameplay.prototype.create = function () {
 
     this.score = 0;
 
+    this.formationData = {};
+    let formData = this.cache.json.get('formations');
+    for (let formationKey in formData) {
+        let formation = formData[formationKey];
+        if (formation.path === undefined) {
+            console.warn('bad formation path data for ' + formationKey);
+            continue;
+        }
+        if (formation.path.length < 2) {
+            console.warn('formation path data ' + formationKey + ' is too short!');
+            continue;
+        }
+        let newPath = new Phaser.Curves.Path(formation.path[0], formation.path[1]);
+        for (let i = 2; i < formation.path.length; i += 2) {
+            newPath.lineTo(formation.path[i], formation.path[i + 1]);
+        };
+        formation.curve = newPath;
+        this.formationData[formationKey] = formation;
+    } 
+
     this.initializePlayer();
     this.initializeEnemies();
     this.initialzeBullets();
     this.initializeCollisions();
     
     let sceneShader = this.add.shader('film_grain', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
-
-
 };
 
 
