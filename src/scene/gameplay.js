@@ -1,5 +1,6 @@
 
 
+
 let Gameplay = function (config) {
     Phaser.Scene.call(this, config);
 
@@ -50,6 +51,8 @@ Gameplay.prototype.init = function () {
 Gameplay.prototype.preload = function () {
     this.load.spritesheet('test_sheet', 'asset/image/fromJesse.png', { frameWidth: 32, frameHeight: 32 });
     this.load.image('test_sheet_image', 'asset/image/fromJesse.png');
+
+    this.load.glsl('film_grain', 'asset/shader/film_grain.frag');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -174,6 +177,7 @@ Gameplay.prototype.create = function () {
         let bullet = this.add.sprite(-9999, -99999, 'test_sheet', 21);
         bullet.setScale(0.25);
         bullet.name = ENEMY_NAME_KEY;
+        bullet.tint = 0x0033FF;
         this.physics.add.existing(bullet);
         bullet.body.setSize(32, 32, true);
         this.enemyBullets.add(bullet);
@@ -229,7 +233,8 @@ Gameplay.prototype.create = function () {
         this.uiScene.refreshUI(this.playerHealth);
     });
     
-    
+    let sceneShader = this.add.shader('film_grain', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
+
 
 };
 
