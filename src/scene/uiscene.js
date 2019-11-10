@@ -66,7 +66,12 @@ InGameUI.prototype.create = function () {
   this.mapSprite = this.add.renderTexture(0, 0, GAME_WIDTH, GAME_HEIGHT);
 };
 InGameUI.prototype.update = function () {
-  if (this.showMapKey.isDown) {
+  let pad = null;
+  if (this.input.gamepad && (this.input.gamepad.total > 0)) {
+    pad = this.input.gamepad.getPad(0);
+  }
+
+  if (this.showMapKey.isDown || ((pad !== null) && pad.X)) {
     this.mapSprite.scaleY = Math.min(this.mapSprite.scaleY + 0.1, 1.0);
   } else {
     this.mapSprite.scaleY = 0;
