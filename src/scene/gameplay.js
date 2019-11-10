@@ -88,16 +88,13 @@ Gameplay.prototype.initializeThreeScene = function () {
     let playerMesh = new THREE.Mesh( cubeGeom, cubeMat );
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
-
-    this.camera.position.set(GAME_WIDTH * 0.5, 32, GAME_HEIGHT * 0.5);
-    this.camera.lookAt(64, 0, 64);
 };
 
 
 Gameplay.prototype.updateThreeScene = function () {
     this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
 
-    this.camera.position.set(GAME_WIDTH * 0.5, 300, GAME_HEIGHT * 0.5 + 300);
+    this.camera.position.set(GAME_WIDTH * 0.5, 350, GAME_HEIGHT * 0.5 + 25);
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
 };
 Gameplay.prototype.setupEvents = function () {
