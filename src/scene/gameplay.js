@@ -42,7 +42,7 @@ Gameplay.prototype.init = function () {
     this.keys.downAimArrow = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
     this.keys.upAimArrow = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
     this.keys.aKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.keys.bKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.keys.bKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.keys.rKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.keys.lKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
@@ -75,7 +75,6 @@ Gameplay.prototype.initializeThreeScene = function () {
     let l = new THREE.AmbientLight(0xFFFFFF);
     this.threeScene.add(l);
 
-
     let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 2, 2 );
     let fieldMat = new THREE.MeshBasicMaterial( { color: 0x005555 } );
     let fieldMesh = new THREE.Mesh( fieldGeom, fieldMat );
@@ -84,8 +83,12 @@ Gameplay.prototype.initializeThreeScene = function () {
     this.threeScene.add(fieldMesh);
 
     let cubeGeom = new THREE.BoxBufferGeometry( 16, 16, 16 );
-    let cubeMat = new THREE.MeshBasicMaterial( { color: 0x003330 } );
+    let hitBoxGeom = new THREE.BoxBufferGeometry( 8, 24, 8 );
+    let cubeMat = new THREE.MeshBasicMaterial( { color: 0x00FF30 } );
+    let hitBoxMat = new THREE.MeshBasicMaterial( { color: 0x773302 } );
     let playerMesh = new THREE.Mesh( cubeGeom, cubeMat );
+    let hitBoxMesh = new THREE.Mesh(hitBoxGeom, hitBoxMat);
+    playerMesh.add(hitBoxMesh);
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
 };
@@ -93,6 +96,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
 Gameplay.prototype.updateThreeScene = function () {
     this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
+    this.sceneMeshData['player'].rotation.set(0, 0, this.player.rotation);
 
     this.camera.position.set(GAME_WIDTH * 0.5, 350, GAME_HEIGHT * 0.5 + 25);
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
@@ -106,8 +110,10 @@ Gameplay.prototype.initializePlayer = function () {
     this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.canShoot = true;
+    this.player.canDodge = true;
     this.physics.add.existing(this.player);
     this.player.body.setSize(8, 8, true);
+    this.player.dodging = false;
     this.time.addEvent({ delay: PLAYER_SHOT_DELAY_MS, callback: () => { this.canShoot = true; }, callbackScope: this, loop: true });
 };
 Gameplay.prototype.initializeEnemies = function() {
@@ -198,7 +204,7 @@ Gameplay.prototype.initializeCollisions = function () {
         }
 
         this.uiScene.refreshUI(this.playerHealth);
-    });
+    }, (player, enemyBullet) => { return (this.player.dodging == false); });
 
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
         
@@ -213,7 +219,7 @@ Gameplay.prototype.initializeCollisions = function () {
         }
 
         this.uiScene.refreshUI(this.playerHealth);
-    });
+    }, (player, enemy) => { return (this.player.dodging == false); });
 };
 
 Gameplay.prototype.create = function () {
@@ -266,18 +272,20 @@ Gameplay.prototype.update = function () {
             return;
         }
 
+        const moveSpeed = this.player.dodging ? PLAYER_DODGE_SPEED : PLAYER_MOVE_SPEED;
+
         // movement
         if (this.keys.rightArrow.isDown) {
-            this.player.body.velocity.x = PLAYER_MOVE_SPEED;
+            this.player.body.velocity.x = moveSpeed;
         } else if (this.keys.leftArrow.isDown) {
-            this.player.body.velocity.x = -PLAYER_MOVE_SPEED;
+            this.player.body.velocity.x = -moveSpeed;
         } else {
             this.player.body.velocity.x = 0;
         }
         if (this.keys.downArrow.isDown) {
-            this.player.body.velocity.y = PLAYER_MOVE_SPEED;
+            this.player.body.velocity.y = moveSpeed;
         } else if (this.keys.upArrow.isDown) {
-            this.player.body.velocity.y = -PLAYER_MOVE_SPEED;
+            this.player.body.velocity.y = -moveSpeed;
         } else {
             this.player.body.velocity.y = 0;
         }
@@ -285,8 +293,8 @@ Gameplay.prototype.update = function () {
             var pad = this.input.gamepad.getPad(0);
 
             if (pad.leftStick.lengthSq() > 0.001) {
-              this.player.body.velocity.x = pad.leftStick.x * PLAYER_MOVE_SPEED;
-              this.player.body.velocity.y = pad.leftStick.y * PLAYER_MOVE_SPEED;
+              this.player.body.velocity.x = pad.leftStick.x * moveSpeed;
+              this.player.body.velocity.y = pad.leftStick.y * moveSpeed;
             }
         }
 
@@ -311,16 +319,41 @@ Gameplay.prototype.update = function () {
         this.playerAimDir.normalize();
 
         // shooting
-        if (this.canShoot === true) {
-            if (this.input.gamepad && (this.input.gamepad.total > 0)) {
-                var pad = this.input.gamepad.getPad(0);
-                if (pad.R2) {
-                    spawnBullet();
-                    this.canShoot = false;
-                }
-            } else if (this.keys.aKey.isDown) {
+        if ((this.canShoot === true) && (this.player.dodging === false)) {
+            let shoot = () => {
                 spawnBullet();
                 this.canShoot = false;
+            };
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && this.input.gamepad.getPad(0).R2) {
+                shoot();
+            } else if (this.keys.aKey.isDown) {
+                shoot();
+            }
+        }
+
+        if ((this.player.dodging === false) && (this.player.canDodge === true)) {
+            let dodge = () => {
+                this.player.dodging = true;
+                this.player.canDodge = false;
+
+                this.time.delayedCall(PLAYER_DODGE_TIME_MS, () => {
+                    this.player.dodging = false;
+                });
+                this.time.delayedCall(PLAYER_DODGE_RECHARGE_TIME_MS, () => {
+                    this.player.canDodge = true;
+                });
+
+                let tweenPivotDir = 1;
+                if (this.player.body.velocity.x < 0) {
+                    tweenPivotDir = -1;
+                }
+
+                this.add.tween({ targets: this.player, duration: PLAYER_DODGE_TIME_MS, rotation: (Math.PI * 2 * tweenPivotDir), onComplete: () => { this.player.rotation = 0; } })
+            };
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && this.input.gamepad.getPad(0).A) {
+                dodge();
+            } else if (this.keys.bKey.isDown) {
+                dodge();
             }
         }
     };

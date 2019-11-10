@@ -2,7 +2,6 @@ const GAME_WIDTH = 640;
 const GAME_HEIGHT = 480;
 const PLAYER_MOVE_CUTOFF = 8;
 
-const PLAYER_MOVE_SPEED = 155.47;
 
 const PLAYER_BULLET_SIZE = 8;
 const PLAYER_BULLET_SPEED = 410;
@@ -15,6 +14,10 @@ const ENEMY_BULLET_POOL_SIZE = 1024;
 // TODO: data driven for player
 const PLAYER_MAX_HEALTH = 10;
 const BULLET_DAMAGE = 3;
+const PLAYER_DODGE_TIME_MS = 270;
+const PLAYER_DODGE_RECHARGE_TIME_MS = 420;
+const PLAYER_MOVE_SPEED = 155.47;
+const PLAYER_DODGE_SPEED = 403.1;
 
 // TODO: data driven per enemy
 const ENEMY_MAX_HEALTH = 22;
