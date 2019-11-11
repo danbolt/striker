@@ -30,6 +30,7 @@ let Gameplay = function (config) {
     const DEFAULT_WORLD_SIZE = 1000;
     this.worldSize = new Phaser.Math.Vector2(DEFAULT_WORLD_SIZE, DEFAULT_WORLD_SIZE);
     this.playerPosition = new Phaser.Math.Vector2(0, 0);
+    this.playerFlightPathDirection = new Phaser.Math.Vector2(1, 0);
     this.squads = [];
 
     this.uiScene = null;
@@ -115,6 +116,13 @@ Gameplay.prototype.setupEvents = function () {
 };
 Gameplay.prototype.removeEvents = function () {
 };
+Gameplay.prototype.updateFlightPath = function (newDir) {
+    this.playerFlightPathDirection.x = newDir.x;
+    this.playerFlightPathDirection.y = newDir.y;
+};
+Gameplay.prototype.getFlightPath = function() {
+    return this.playerFlightPathDirection;
+}
 
 Gameplay.prototype.initializePlayer = function () {
     this.playerPosition = new Phaser.Math.Vector2(this.worldSize.x * 0.5, this.worldSize.y * 0.5);
@@ -266,8 +274,8 @@ Gameplay.prototype.create = function () {
     this.squads = [
         {
             "formation": "sample_a",
-            "x": Math.random() * this.worldSize.x,
-            "y": Math.random() * this.worldSize.y
+            "x": 0.25 * this.worldSize.x,
+            "y": 0.25 * this.worldSize.y
         },
         {
             "formation": "sample_b",
@@ -529,8 +537,10 @@ Gameplay.prototype.update = function () {
     //})
     //this.uiScene.refreshUI(this.playerHealth, this.score);
 
-    this.playerPosition.x += 0.1
-    this.playerPosition.y += 0.1
+
+    const sixtyFramesPerSecond = 0.016;
+    this.playerPosition.x += this.playerFlightPathDirection.x * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
+    this.playerPosition.y += this.playerFlightPathDirection.y * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
     this.uiScene.refreshMap(this.worldSize, this.playerPosition, this.squads);
     
 };
