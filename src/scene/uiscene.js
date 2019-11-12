@@ -80,7 +80,7 @@ InGameUI.prototype.create = function () {
   this.commitDirectionKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
   this.debugHealthText = this.add.bitmapText(16, 16, 'newsgeek', '');
-  this.refreshUI();
+  this.refreshUI(PLAYER_MAX_HEALTH);
 
   this.gameplayScene = this.scene.get('Gameplay');
 
@@ -105,7 +105,6 @@ InGameUI.prototype.create = function () {
   this.triangleGeom.isFilled = false;
   this.triangleGeom.isStroked = true;
   this.triangleGeom.visible = false;
-  console.log(this.triangleGeom);
 
   this.mapSprite = this.add.renderTexture(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
   this.mapSprite.setOrigin(0.5);

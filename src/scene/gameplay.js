@@ -23,6 +23,8 @@ let Gameplay = function (config) {
     this.renderer = null;
     this.threeScene = new THREE.Scene();
     this.sceneMeshData = {};
+    this.enemyMeshPool = {};
+    this.bulletMeshPool = {};
     this.mixers = [];
 
     this.formationData = {};
@@ -87,6 +89,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
     let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 2, 2 );
     let fieldMat = new THREE.MeshBasicMaterial( { color: 0x005555 } );
+    fieldMat.wireframe = true;
     let fieldMesh = new THREE.Mesh( fieldGeom, fieldMat );
     fieldMesh.position.set(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
     fieldMesh.rotation.x = Math.PI * -0.5;
@@ -101,6 +104,38 @@ Gameplay.prototype.initializeThreeScene = function () {
     playerMesh.add(hitBoxMesh);
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
+
+    let basicEnemyGeom = new THREE.BoxBufferGeometry(32, 32, 32);
+    let basicEnemyMat = new THREE.MeshBasicMaterial( { color: 0xBB2222 } );
+    let basicEnemyMesh = new THREE.Mesh(basicEnemyGeom, basicEnemyMat);
+    this.enemyMeshPool['basic'] = [];
+    for (var i = 1; i < ENEMY_POOL_SIZE; i++) {
+        let c = basicEnemyMesh.clone();
+        this.enemyMeshPool['basic'].push(c);
+        this.threeScene.add(c);
+        c.visible = false;
+    }
+
+    let basicBulletGeom = new THREE.BoxBufferGeometry(8, 8, 8);
+    let basicBulletMat = new THREE.MeshBasicMaterial( { color: 0x88FF88 } );
+    let basicEnemyBulletMat = new THREE.MeshBasicMaterial( { color: 0x004400 } );
+    let basicBulletMesh = new THREE.Mesh(basicBulletGeom, basicBulletMat);
+    this.bulletMeshPool['bullet'] = [];
+    for (var i = 0; i < PLAYER_BULLET_POOL_SIZE; i++) {
+        let c = basicBulletMesh.clone();
+        this.bulletMeshPool['bullet'].push(c);
+        this.threeScene.add(c);
+        c.visible = false;
+    }
+
+    let basicEnemyBulletMesh = new THREE.Mesh(basicBulletGeom, basicEnemyBulletMat);
+    this.bulletMeshPool['enemy'] = [];
+    for (var i = 0; i < PLAYER_BULLET_POOL_SIZE; i++) {
+        let c = basicEnemyBulletMesh.clone();
+        this.bulletMeshPool['enemy'].push(c);
+        this.threeScene.add(c);
+        c.visible = false;
+    }
 };
 
 
@@ -130,6 +165,7 @@ Gameplay.prototype.initializePlayer = function () {
 
     this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
     this.playerHealth = PLAYER_MAX_HEALTH;
+    this.player.setVisible(false);
     this.canShoot = true;
     this.player.canDodge = true;
     this.physics.add.existing(this.player);
@@ -144,6 +180,7 @@ Gameplay.prototype.initializeEnemies = function() {
         this.physics.add.existing(enemy);
         enemy.body.moves = false;
         enemy.tint = 0xFF6666;
+        enemy.visible = false;
         enemy.name = BULLET_NAME_KEY;
         enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
         enemy.path = null;
@@ -152,6 +189,7 @@ Gameplay.prototype.initializeEnemies = function() {
         enemy.entering = false;
         enemy.squadIndex = -1;
         enemy.shipIndex = -1;
+        enemy.mesh = null;
         this.enemies.add(enemy);
         this.enemies.killAndHide(enemy);
     }
@@ -185,7 +223,7 @@ Gameplay.prototype.deployFormation = function(formationKey, deployDelay, squadIn
             newEnemy.x = formation.path[0];
             newEnemy.y = formation.path[1];
             newEnemy.setActive(true);
-            newEnemy.setVisible(true);
+            //newEnemy.setVisible(true);
             newEnemy.path = formation.curve;
             newEnemy.pathPos = 0;
             newEnemy.startOffset.x = formation.offset_per_deploy.x * i;
@@ -193,6 +231,11 @@ Gameplay.prototype.deployFormation = function(formationKey, deployDelay, squadIn
             newEnemy.entering = true;
             newEnemy.shipIndex = i;
             newEnemy.squadIndex = squadIndex;
+            newEnemy.type = shipType;
+            if (this.enemyMeshPool[shipType].length > 0) {
+                newEnemy.mesh = this.enemyMeshPool[shipType].pop();
+                newEnemy.mesh.visible = true;
+            }
             squad.onscreen_ships++;
         }, loop: false });
     };
@@ -208,6 +251,8 @@ Gameplay.prototype.initialzeBullets = function () {
         bullet.body.setSize(32, 32, true);
         this.playerBullets.add(bullet);
         this.playerBullets.killAndHide(bullet);
+        bullet.mesh = this.bulletMeshPool[bullet.name][i];
+        bullet.visible = false;
     }
 
     this.enemyBullets = this.add.group();
@@ -220,6 +265,8 @@ Gameplay.prototype.initialzeBullets = function () {
         bullet.body.setSize(32, 32, true);
         this.enemyBullets.add(bullet);
         this.enemyBullets.killAndHide(bullet);
+        bullet.mesh = this.bulletMeshPool[bullet.name][i];
+        bullet.visible = false;
     }
 };
 Gameplay.prototype.initializeCollisions = function () {
@@ -227,6 +274,9 @@ Gameplay.prototype.initializeCollisions = function () {
         const squad = this.squads[enemy.squadIndex];
         if (squad === null) {
             this.enemies.killAndHide(enemy);
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
             enemy.x = -99999;
             enemy.y = -99999;
             return;
@@ -236,6 +286,9 @@ Gameplay.prototype.initializeCollisions = function () {
         if (squad.health_data[enemy.shipIndex] <= 0) {
             squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
             enemy.x = -99999;
             enemy.y = -99999;
         }
@@ -254,7 +307,6 @@ Gameplay.prototype.initializeCollisions = function () {
         this.playerHealth -= ENEMY_BULLET_DAMAGE;
         if (this.playerHealth <= 0) {
             this.player.setActive(false);
-            this.player.setVisible(false);
         }
 
         this.uiScene.refreshUI(this.playerHealth, this.score);
@@ -269,13 +321,15 @@ Gameplay.prototype.initializeCollisions = function () {
         squad.health_data[enemy.shipIndex] = 0;
         squad.onscreen_ships--;
         this.enemies.killAndHide(enemy);
+        this.enemyMeshPool[enemy.type].push(enemy.mesh);
+        enemy.mesh.visible = false;
+        enemy.mesh = null;
         enemy.x = -99999;
         enemy.y = -99999;
 
         this.playerHealth -= ENEMY_COLLIDE_DAMAGE;
         if (this.playerHealth <= 0) {
             this.player.setActive(false);
-            this.player.setVisible(false);
         }
 
         this.uiScene.refreshUI(this.playerHealth, this.score);
@@ -456,7 +510,6 @@ Gameplay.prototype.update = function () {
         newBullet.x = this.player.x;
         newBullet.y = this.player.y;
         newBullet.setActive(true);
-        newBullet.setVisible(true);
         newBullet.body.velocity.x = this.playerAimDir.x * PLAYER_BULLET_SPEED;
         newBullet.body.velocity.y = this.playerAimDir.y * PLAYER_BULLET_SPEED;
     };
@@ -572,10 +625,12 @@ Gameplay.prototype.update = function () {
     this.player.x = Phaser.Math.Clamp(this.player.x, PLAYER_MOVE_CUTOFF, GAME_WIDTH - PLAYER_MOVE_CUTOFF);
     this.player.y = Phaser.Math.Clamp(this.player.y, PLAYER_MOVE_CUTOFF, GAME_HEIGHT - PLAYER_MOVE_CUTOFF);
 
-    let playerBulletIter = (bullet) => {
+    let playerBulletIter = (bullet, i) => {
+        bullet.mesh.visible = bullet.active;
         if (bullet.active === false) {
             return;
         }
+        bullet.mesh.position.set(bullet.x, 0, bullet.y);
         
         if (this.cameras.cameras[0].worldView.contains(bullet.x, bullet.y) === false) {
             bullet.x = -999999;
@@ -584,9 +639,11 @@ Gameplay.prototype.update = function () {
         }
     };
     let enemyBulletIter = (bullet) => {
+        bullet.mesh.visible = bullet.active;
         if (bullet.active === false) {
             return;
         }
+        bullet.mesh.position.set(bullet.x, 0, bullet.y);
         
         if (this.cameras.cameras[0].worldView.contains(bullet.x, bullet.y) === false) {
             bullet.x = -999999;
@@ -607,7 +664,6 @@ Gameplay.prototype.update = function () {
         newBullet.x = enemy.x;
         newBullet.y = enemy.y;
         newBullet.setActive(true);
-        newBullet.setVisible(true);
         newBullet.body.velocity.x = Math.cos(angle) * velocity;
         newBullet.body.velocity.y = Math.sin(angle) * velocity;
     };
@@ -616,7 +672,7 @@ Gameplay.prototype.update = function () {
             return;
         }
 
-        enemy.timeToTextBullet -= 16; // <-- need real delta
+        enemy.timeToTextBullet -= 16; // <-- TODO: need real delta
         if (enemy.timeToTextBullet <= 0) {
             enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
             spawnEnemyBullet(enemy, Math.PI * 0.5, ENEMY_BULLET_SPEED);
@@ -631,6 +687,9 @@ Gameplay.prototype.update = function () {
         enemy.path.getPoint(enemy.pathPos, pathPointCache);
         enemy.x = pathPointCache.x + enemy.startOffset.x;
         enemy.y = pathPointCache.y + enemy.startOffset.y;
+        if (enemy.mesh !== null) {
+            enemy.mesh.position.set(enemy.x, 0, enemy.y);
+        }
 
         const inWorld = this.cameras.cameras[0].worldView.contains(enemy.x, enemy.y);
         if ((enemy.entering === false) && (inWorld === false)) {
@@ -640,6 +699,9 @@ Gameplay.prototype.update = function () {
             }
             enemy.x = -999999;
             enemy.y = -999999;
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
             this.enemies.killAndHide(enemy);
             return;
         }
@@ -664,6 +726,9 @@ Gameplay.prototype.shutdown = function () {
     this.player = null;
     this.playerBullets.clear(true, true);
     this.enemyBullets.clear(true, true);
+
+    this.bulletMeshPool = {};
+    this.enemyMeshPool = {};
 
     while(this.threeScene.children.length > 0){ 
         this.threeScene.remove(this.threeScene.children[0]); 
