@@ -51,6 +51,10 @@ InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
   if (squads !== undefined && (~~(this.time.now * 0.05716) % 2 === 0)) {
     this.mapSprite.globalTint = 0xFF0000;
     squads.forEach((squad) => {
+      if (squad === null) {
+        return;
+      }
+
       this.enemyGeom.tint = 0xFF000;
       this.mapSprite.draw(this.enemyGeom, MAP_ORIGIN_X + ((squad.x / worldSize.x) * MAP_WIDTH), MAP_ORIGIN_Y + ((squad.y / worldSize.y) * MAP_HEIGHT), 0.7);
     });
@@ -151,9 +155,9 @@ InGameUI.prototype.update = function () {
     this.aimDirection.y = 0;
   }
   if (pad !== null) {
-    if (pad.leftStick.lengthSq() > 0.1) {
-      this.aimDirection.x = pad.leftStick.x;
-      this.aimDirection.y = pad.leftStick.y;
+    if (pad.rightStick.lengthSq() > 0.1) {
+      this.aimDirection.x = pad.rightStick.x;
+      this.aimDirection.y = pad.rightStick.y;
     }
   }
   this.aimDirection.normalize();

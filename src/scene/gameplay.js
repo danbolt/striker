@@ -119,6 +119,7 @@ Gameplay.prototype.removeEvents = function () {
 Gameplay.prototype.updateFlightPath = function (newDir) {
     this.playerFlightPathDirection.x = newDir.x;
     this.playerFlightPathDirection.y = newDir.y;
+    this.playerFlightPathDirection.normalize();
 };
 Gameplay.prototype.getFlightPath = function() {
     return this.playerFlightPathDirection;
@@ -143,31 +144,35 @@ Gameplay.prototype.initializeEnemies = function() {
         this.physics.add.existing(enemy);
         enemy.body.moves = false;
         enemy.tint = 0xFF6666;
-        enemy.health = ENEMY_MAX_HEALTH;
         enemy.name = BULLET_NAME_KEY;
         enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
-        enemy.path = testPathA;
+        enemy.path = null;
         enemy.startOffset = new Phaser.Math.Vector2(0, 0);
         enemy.pathPos = 0;
         enemy.entering = false;
+        enemy.squadIndex = -1;
+        enemy.shipIndex = -1;
         this.enemies.add(enemy);
         this.enemies.killAndHide(enemy);
     }
-
-    // some test enemies
-    this.deployFormation('sample_c', 500);
-    this.deployFormation('sample_d', 2500);
 };
 
-Gameplay.prototype.deployFormation = function(formationKey, deployDelay) {
+Gameplay.prototype.deployFormation = function(formationKey, deployDelay, squadIndex) {
     const formation = this.formationData[formationKey];
     if (formation === undefined) {
         console.warn('Could not find/deploy ' + formationKey + ' does it exist?');
         return;
     }
 
+    const squad = this.squads[squadIndex];
+    const healthInfo = this.squads[squadIndex].health_data;
+
     deployDelay = (deployDelay === undefined) ? 0 : deployDelay;
     for (let i = 0; i < formation.ships.length; i++) {
+        if (healthInfo[i] <= 0) {
+            continue;
+        }
+
         this.time.addEvent({ delay: (deployDelay + (i * formation.deploy_rate)), callback: () => {
             const shipType = formation.ships[i];
             // TODO: Depends on ship type
@@ -186,6 +191,9 @@ Gameplay.prototype.deployFormation = function(formationKey, deployDelay) {
             newEnemy.startOffset.x = formation.offset_per_deploy.x * i;
             newEnemy.startOffset.y = formation.offset_per_deploy.y * i;
             newEnemy.entering = true;
+            newEnemy.shipIndex = i;
+            newEnemy.squadIndex = squadIndex;
+            squad.onscreen_ships++;
         }, loop: false });
     };
 
@@ -216,9 +224,17 @@ Gameplay.prototype.initialzeBullets = function () {
 };
 Gameplay.prototype.initializeCollisions = function () {
     this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => {
-        // on overlap
-        enemy.health -= BULLET_DAMAGE;
-        if (enemy.health <= 0) {
+        const squad = this.squads[enemy.squadIndex];
+        if (squad === null) {
+            this.enemies.killAndHide(enemy);
+            enemy.x = -99999;
+            enemy.y = -99999;
+            return;
+        }
+        squad.health_data[enemy.shipIndex] -= BULLET_DAMAGE;
+
+        if (squad.health_data[enemy.shipIndex] <= 0) {
+            squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
             enemy.x = -99999;
             enemy.y = -99999;
@@ -230,7 +246,7 @@ Gameplay.prototype.initializeCollisions = function () {
     }, (bullet, enemy) => { return enemy.active; });
 
     this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
-        
+
         this.enemyBullets.killAndHide(enemyBullet);
         enemyBullet.x = -99999;
         enemyBullet.y = -99999;
@@ -245,7 +261,13 @@ Gameplay.prototype.initializeCollisions = function () {
     }, (player, enemyBullet) => { return (this.player.dodging == false); });
 
     this.physics.add.overlap(this.player, this.enemies, (player, enemy) => {
-        
+        const squad = this.squads[enemy.squadIndex];
+        if (squad === null) {
+            return;
+        }
+
+        squad.health_data[enemy.shipIndex] = 0;
+        squad.onscreen_ships--;
         this.enemies.killAndHide(enemy);
         enemy.x = -99999;
         enemy.y = -99999;
@@ -270,30 +292,6 @@ Gameplay.prototype.create = function () {
     this.score = 0;
     this.squads = [];
 
-    // some dummy squads
-    this.squads = [
-        {
-            "formation": "sample_a",
-            "x": 0.25 * this.worldSize.x,
-            "y": 0.25 * this.worldSize.y
-        },
-        {
-            "formation": "sample_b",
-            "x": Math.random() * this.worldSize.x,
-            "y": Math.random() * this.worldSize.y
-        },
-        {
-            "formation": "sample_c",
-            "x": Math.random() * this.worldSize.x,
-            "y": Math.random() * this.worldSize.y
-        },
-        {
-            "formation": "sample_d",
-            "x": Math.random() * this.worldSize.x,
-            "y": Math.random() * this.worldSize.y
-        }
-    ]
-
     this.formationData = {};
     let formData = this.cache.json.get('formations');
     for (let formationKey in formData) {
@@ -314,6 +312,37 @@ Gameplay.prototype.create = function () {
         this.formationData[formationKey] = formation;
     } 
 
+    // some dummy squads
+    this.squads = [
+        {
+            "formation": "sample_a",
+            "x": 0.25 * this.worldSize.x,
+            "y": 0.25 * this.worldSize.y,
+            "in_battle": false
+        },
+        {
+            "formation": "sample_a",
+            "x": 0.25 * this.worldSize.x,
+            "y": 0.75 * this.worldSize.y,
+            "in_battle": false
+        },
+        {
+            "formation": "sample_c",
+            "x": 0.55 * this.worldSize.x,
+            "y": 0.35 * this.worldSize.y,
+            "in_battle": false
+        },
+        {
+            "formation": "sample_a",
+            "x": 0.75 * this.worldSize.x,
+            "y": 0.75 * this.worldSize.y,
+            "in_battle": false
+        }
+    ];
+    this.squads.forEach((squad) => {
+        this.initializeSquadData(squad);
+    })
+
     this.initializePlayer();
     this.initializeEnemies();
     this.initialzeBullets();
@@ -322,16 +351,84 @@ Gameplay.prototype.create = function () {
     let sceneShader = this.add.shader('film_grain', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
 };
 
+Gameplay.prototype.initializeSquadData = function(squad) {
+    squad.health_data = [];
+    const formation = this.formationData[squad.formation];
+    formation.ships.forEach((ship) => {
+        // TODO: per-ship health
+        const shipHealth = ENEMY_MAX_HEALTH;
+        squad.health_data.push(shipHealth);
+    });
+    squad.onscreen_ships = 0;
+}
 
 let pathPointCache = new Phaser.Math.Vector2(0, 0);
-let testPathA = new Phaser.Curves.Path(GAME_WIDTH, GAME_HEIGHT * 0.1);
-testPathA.lineTo(GAME_WIDTH * 0.75, GAME_HEIGHT * 0.25)
-testPathA.ellipseTo(GAME_WIDTH * 0.25, 100, 0, 180, true, 0);
-testPathA.lineTo(0, GAME_HEIGHT * 0.1);
-testPathA.lineTo(-700, 0);
+
+let squadPointCache = new Phaser.Math.Vector2(0, 0);
+Gameplay.prototype.updateWorld = function () {
+    const sixtyFramesPerSecond = 0.016;
+
+    this.playerPosition.x += this.playerFlightPathDirection.x * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
+    this.playerPosition.y += this.playerFlightPathDirection.y * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
+    this.uiScene.refreshMap(this.worldSize, this.playerPosition, this.squads);
+
+    // If we've left the world bounds, turn around
+    if ((this.playerPosition.x < 0) || (this.playerPosition.x > this.worldSize.x)) {
+        this.playerPosition.x = Phaser.Math.Clamp(this.playerPosition.x, 0, this.worldSize.x);
+        this.playerFlightPathDirection.x *= -1;
+    }
+    if ((this.playerPosition.y < 0) || (this.playerPosition.y > this.worldSize.y)) {
+        this.playerPosition.y = Phaser.Math.Clamp(this.playerPosition.y, 0, this.worldSize.y);
+        this.playerFlightPathDirection.y *= -1;
+    }
+
+    // TODO: Spatial sorting of squads for faster distance-checking
+
+    this.squads.forEach((squad, index) => {
+        if (squad === null) {
+            return;
+        }
+
+        squadPointCache.x = squad.x;
+        squadPointCache.y = squad.y;
+
+        // If all enemies are done, then this squad is effectively destroyed
+        let healthSum = 0;
+        squad.health_data.forEach((val) => {
+            healthSum += val;
+        });
+        if (healthSum <= 0.0000001) {
+            this.squads[index] = null;
+            return;
+        }
+
+        // We can never be in battle if we're too far away
+        if ((squad.in_battle === false) && (this.playerPosition.distanceSq(squadPointCache) > ENTRY_INTO_BATTLE_DISTANCE_SQ)) {
+            return;
+        }
+
+        // If we're too far away and there are no onscreen ships, then we're not in battle anymore
+        if ((squad.in_battle === true) && ((this.playerPosition.distanceSq(squadPointCache) > ENTRY_INTO_BATTLE_DISTANCE_SQ) || (squad.onscreen_ships < 1))) {
+            squad.x = this.playerPosition.x + -(this.playerFlightPathDirection.x * (ENTRY_INTO_BATTLE_DISTANCE + 5));
+            squad.y = this.playerPosition.y + -(this.playerFlightPathDirection.y * (ENTRY_INTO_BATTLE_DISTANCE + 5));
+
+            squad.in_battle = false;
+            return;
+        }
+
+        // If we're already in battle, update position instead
+        if (squad.in_battle === true) {
+            squad.x = this.playerPosition.x;
+            squad.y = this.playerPosition.y;
+            return;
+        }
+
+        squad.in_battle = true;
+        this.deployFormation(squad.formation, 0, index);
+    });
+};
 
 Gameplay.prototype.update = function () {
-
     let spawnBullet = () => {
         let newBullet = this.playerBullets.getFirstDead();
         if (newBullet === null) {
@@ -519,6 +616,10 @@ Gameplay.prototype.update = function () {
 
         const inWorld = this.cameras.cameras[0].worldView.contains(enemy.x, enemy.y);
         if ((enemy.entering === false) && (inWorld === false)) {
+            const squad = this.squads[enemy.squadIndex];
+            if (squad !== null) {
+                squad.onscreen_ships--;
+            }
             enemy.x = -999999;
             enemy.y = -999999;
             this.enemies.killAndHide(enemy);
@@ -538,10 +639,7 @@ Gameplay.prototype.update = function () {
     //this.uiScene.refreshUI(this.playerHealth, this.score);
 
 
-    const sixtyFramesPerSecond = 0.016;
-    this.playerPosition.x += this.playerFlightPathDirection.x * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
-    this.playerPosition.y += this.playerFlightPathDirection.y * sixtyFramesPerSecond * PLAYER_FLIGHT_SPEED;
-    this.uiScene.refreshMap(this.worldSize, this.playerPosition, this.squads);
+    this.updateWorld();
     
 };
 Gameplay.prototype.shutdown = function () {
