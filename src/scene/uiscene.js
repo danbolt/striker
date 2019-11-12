@@ -65,8 +65,7 @@ InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
         squadPosY += Math.sin(t) * miniRadius;
       }
 
-      this.enemyGeom.tint = 0xFF000;
-      this.mapSprite.draw(this.enemyGeom, squadPosX, squadPosY, 0.7);
+      this.mapSprite.draw(this.triangleGeom, squadPosX, squadPosY, 0.7, 0xFF0000);
     });
     this.mapSprite.globalTint = 0xFFFFFF;
   }
@@ -86,7 +85,7 @@ InGameUI.prototype.create = function () {
   this.gameplayScene = this.scene.get('Gameplay');
 
   this.input.gamepad.on('down', (pad, button, value) => {
-    if (button.index === 3) {
+    if (button.index === 2) {
       this.showingMap = !this.showingMap;
     }
   });
@@ -96,21 +95,17 @@ InGameUI.prototype.create = function () {
 
   this.mapGeom = new Phaser.GameObjects.Polygon(this, 0, 0, [0, 0, MAP_WIDTH, 0, MAP_WIDTH, MAP_HEIGHT, 0, MAP_HEIGHT], 0x2266DD, 0.25);
 
-  this.enemyGeom = new Phaser.GameObjects.Polygon(this, 0, 0, [0, 10, 4, -8, -8, 4, 8, 4, -4, -8], 0xFF0000, 1.0);
-  this.enemyGeom.isFilled = false;
-  this.enemyGeom.isStroked = true;
-  this.enemyGeom.visible = false;
-
   this.chevronGeom = new Phaser.GameObjects.Polygon(this, 4, 4, [0, 0, 8, 4, 8, -4, 0, -8, -8, -4, -8, 4], 0xFF0000, 1.0);
   this.chevronGeom.isFilled = false;
   this.chevronGeom.isStroked = true;
   this.chevronGeom.visible = false;
   this.chevronGeom.setOrigin(0, 0);
 
-  this.triangleGeom = new Phaser.GameObjects.Triangle(this, 0, 0, -8, 0, 8, 0, 0, 16, 0xff0000);
+  this.triangleGeom = new Phaser.GameObjects.Triangle(this, 0, 0, -4, 0, 4, 0, 0, 8, 0xFF0000, 1.0);
   this.triangleGeom.isFilled = false;
   this.triangleGeom.isStroked = true;
   this.triangleGeom.visible = false;
+  console.log(this.triangleGeom);
 
   this.mapSprite = this.add.renderTexture(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
   this.mapSprite.setOrigin(0.5);
@@ -177,7 +172,7 @@ InGameUI.prototype.update = function () {
     this.showingMap = !(this.showingMap);
   }
 
-  if (this.showingMap && (this.aimDirection.lengthSq() > 0.1) && (this.commitDirectionKey.isDown || ((pad !== null) && pad.X))) {
+  if (this.showingMap && (this.aimDirection.lengthSq() > 0.1) && (this.commitDirectionKey.isDown || ((pad !== null) && (pad.Y || pad.R1)))) {
     this.gameplayScene.updateFlightPath(this.aimDirection);
   }
 
