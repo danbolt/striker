@@ -55,8 +55,18 @@ InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
         return;
       }
 
+      let squadPosX = MAP_ORIGIN_X + ((squad.x / worldSize.x) * MAP_WIDTH);
+      let squadPosY = MAP_ORIGIN_Y + ((squad.y / worldSize.y) * MAP_HEIGHT);
+
+      const miniRadius = 10;
+      const t = this.time.now / 100
+      if (squad.in_battle === true) {
+        squadPosX += Math.cos(t) * miniRadius;
+        squadPosY += Math.sin(t) * miniRadius;
+      }
+
       this.enemyGeom.tint = 0xFF000;
-      this.mapSprite.draw(this.enemyGeom, MAP_ORIGIN_X + ((squad.x / worldSize.x) * MAP_WIDTH), MAP_ORIGIN_Y + ((squad.y / worldSize.y) * MAP_HEIGHT), 0.7);
+      this.mapSprite.draw(this.enemyGeom, squadPosX, squadPosY, 0.7);
     });
     this.mapSprite.globalTint = 0xFFFFFF;
   }
