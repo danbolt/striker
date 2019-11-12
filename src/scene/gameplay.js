@@ -312,7 +312,9 @@ Gameplay.prototype.create = function () {
         this.formationData[formationKey] = formation;
     } 
 
-    // some dummy squads
+
+    /*
+    // TODO: editor data should look like this
     this.squads = [
         {
             "formation": "sample_a",
@@ -339,6 +341,22 @@ Gameplay.prototype.create = function () {
             "in_battle": false
         }
     ];
+    */
+
+    // some dummy squads
+    for (let i = 0; i < 100; i++) {
+        const minR = 100;
+        const extraR = Math.random() * 400;
+        const dir = Math.random() * Math.PI * 2;
+        this.squads.push({
+            formation: ['sample_a', 'sample_b', 'sample_c', 'sample_d'][~~(Math.random() * 4)],
+            in_battle: false,
+            x: (this.worldSize.x * 0.5) + Math.cos(dir) * (minR + extraR),
+            y: (this.worldSize.y * 0.5) + Math.sin(dir) * (minR + extraR)
+        });
+    }
+
+
     this.squads.forEach((squad) => {
         this.initializeSquadData(squad);
     })
