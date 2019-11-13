@@ -31,7 +31,7 @@ void main ()
 	vec2 halfResolution = resolution * 0.5;
 	float distanceToCorner = distance(halfResolution, vec2(0.0, 0.0));
 	float distanceToCenter = distance(gl_FragCoord.xy, halfResolution);
-	float noiseVolume = distanceToCenter / distanceToCorner * 0.16;
+	float noiseVolume = distanceToCenter / distanceToCorner * 0.06;
 
-    gl_FragColor = (vec4(noiseVal, noiseVal, noiseVal, 0.25) * noiseVolume) + 0.0312;
+    gl_FragColor = (vec4(noiseVal, noiseVal, noiseVal, 0.15) * noiseVolume) + 0.0312;
 }

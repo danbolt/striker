@@ -16,6 +16,8 @@ const PLAYER_BULLET_POOL_SIZE = 48;
 const ENEMY_POOL_SIZE = 64;
 const ENEMY_BULLET_POOL_SIZE = 1024;
 
+const DEFAULT_WORLD_SIZE = 1000;
+
 // TODO: data driven for player
 const PLAYER_MAX_HEALTH = 10;
 const BULLET_DAMAGE = 3;

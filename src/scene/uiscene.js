@@ -176,16 +176,16 @@ InGameUI.prototype.update = function () {
   }
 
   const flightPath = this.gameplayScene.getFlightPath();
-  this.cachedCompassRotation = Phaser.Math.Interpolation.Linear([this.cachedCompassRotation, Math.atan2(flightPath.x, flightPath.y) + Math.PI], 0.07);
-  this.compassGroup.rotation = this.cachedCompassRotation;
+  this.cachedCompassRotation = Phaser.Math.Interpolation.Linear([this.cachedCompassRotation, Math.atan2(flightPath.x, flightPath.y) + Math.PI], 0.035);
+  this.compassGroup.rotation = this.cachedCompassRotation + (Math.sin(Math.cos(this.time.now / 500) * Math.sin(this.time.now / 500)) * 0.1);
   this.compassGroup.alpha = 0.1412 + (Math.sin(this.time.now * 0.00121) * 0.0421)
 
   if (this.showingMap ) {
     this.mapSprite.scaleY = Math.min(this.mapSprite.scaleY + 0.12, 1.0);
   } else {
-    this.mapSprite.scaleY = Math.max(this.mapSprite.scaleY - 0.09, 0.0);
+    this.mapSprite.scaleY = Math.max(this.mapSprite.scaleY - 0.09, 0.7);
   }
-  this.mapSprite.scaleX = Phaser.Math.Easing.Quartic.In(this.mapSprite.scaleY);
+  this.mapSprite.scaleX = this.mapSprite.scaleY;
   this.mapSprite.x = Phaser.Math.Interpolation.Linear([0, GAME_WIDTH * 0.35], Phaser.Math.Easing.Quartic.In(this.mapSprite.scaleY));
   this.mapSprite.y = Phaser.Math.Interpolation.Linear([GAME_HEIGHT, GAME_HEIGHT * 0.65], Phaser.Math.Easing.Quartic.In(this.mapSprite.scaleY));
 };

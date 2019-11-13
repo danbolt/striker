@@ -19,9 +19,11 @@ let Gameplay = function (config) {
     this.enemyBullets = null;
 
     this.three = null;
-    this.camera = new THREE.PerspectiveCamera( 75, GAME_WIDTH / GAME_HEIGHT, 1, 700 );
+    this.camera = new THREE.PerspectiveCamera( 60, GAME_WIDTH / GAME_HEIGHT, 1, 1500 );
     this.renderer = null;
     this.threeScene = new THREE.Scene();
+    this.threeScene.fog = new THREE.Fog(0x9999FF, 0, 2500);
+    this.threeScene.background = new THREE.Color('#9999FF');
     this.sceneMeshData = {};
     this.enemyMeshPool = {};
     this.bulletMeshPool = {};
@@ -29,17 +31,17 @@ let Gameplay = function (config) {
 
     this.formationData = {};
 
-    const DEFAULT_WORLD_SIZE = 1000;
     this.worldSize = new Phaser.Math.Vector2(DEFAULT_WORLD_SIZE, DEFAULT_WORLD_SIZE);
     this.playerPosition = new Phaser.Math.Vector2(0, 0);
     this.playerFlightPathDirection = new Phaser.Math.Vector2(1, 0);
+    this.cameraFlightPathAngle = 0.0;
     this.squads = [];
 
     this.uiScene = null;
 
 };
 Gameplay.prototype.init = function () {
-    this.renderer = new THREE.WebGLRenderer( { canvas: this.game.canvas, context: this.game.context, antialias: false } );
+    this.renderer = new THREE.WebGLRenderer( { canvas: this.game.canvas, context: this.game.context, antialias: false, powerPreference: 'low-power' } );
     this.renderer.autoClear = false;
 
     this.keyboard = this.input.keyboard;
@@ -118,7 +120,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
     let basicBulletGeom = new THREE.BoxBufferGeometry(8, 8, 8);
     let basicBulletMat = new THREE.MeshBasicMaterial( { color: 0x88FF88 } );
-    let basicEnemyBulletMat = new THREE.MeshBasicMaterial( { color: 0x004400 } );
+    let basicEnemyBulletMat = new THREE.MeshBasicMaterial( { color: 0xcccc00 } );
     let basicBulletMesh = new THREE.Mesh(basicBulletGeom, basicBulletMat);
     this.bulletMeshPool['bullet'] = [];
     for (var i = 0; i < PLAYER_BULLET_POOL_SIZE; i++) {
@@ -136,16 +138,81 @@ Gameplay.prototype.initializeThreeScene = function () {
         this.threeScene.add(c);
         c.visible = false;
     }
-};
 
+    // TODO: data this
+    this.sceneNoise = new SimplexNoise(Math);
+
+    let generateChunkMesh = (size, sections, chunkOffsetX, chunkOffsetY) => {
+        const polyDist = size / sections;
+        const polyAmount = sections;
+        var chunkGeom = new THREE.Geometry();
+        let iterVal = 0;
+        const scale = 0.25;
+        for (var x = 0; x < polyAmount; x++) {
+            for (var y = 0; y < polyAmount; y++) {
+                let northWestValue = this.sceneNoise.noise((chunkOffsetX + x * polyDist) * scale, (chunkOffsetY + y * polyDist) * scale);
+                let northEastValue = this.sceneNoise.noise((chunkOffsetX + (x + 1) * polyDist) * scale, (chunkOffsetY + y * polyDist) * scale);
+                let southEastValue = this.sceneNoise.noise((chunkOffsetX + x * polyDist) * scale, (chunkOffsetY + (y + 1) * polyDist) * scale);
+                let southWestValue = this.sceneNoise.noise((chunkOffsetX + (x + 1) * polyDist) * scale, (chunkOffsetY + (y + 1) * polyDist) * scale);
+                chunkGeom.vertices.push(new THREE.Vector3(x * polyDist      , northWestValue * 64, y * polyDist),
+                                        new THREE.Vector3((x + 1) * polyDist, northEastValue * 64, y * polyDist),
+                                        new THREE.Vector3(x * polyDist      , southEastValue * 64, (y + 1) * polyDist),
+                                        new THREE.Vector3((x + 1) * polyDist, southWestValue * 64, (y + 1) * polyDist));
+
+                chunkGeom.faces.push(new THREE.Face3(iterVal + 1, iterVal, iterVal + 2))
+                chunkGeom.faces.push(new THREE.Face3(iterVal + 1, iterVal + 2, iterVal + 3))
+                iterVal += 4;
+            }
+        }
+        chunkGeom.computeBoundingSphere();
+
+        let chunkMat = new THREE.MeshBasicMaterial( { color: 0x113322 } );
+        let chunkMesh = new THREE.Mesh( chunkGeom, chunkMat );
+        let waterSurfaceGeom = new THREE.PlaneBufferGeometry(polyDist * polyAmount, polyDist * polyAmount, 1);
+        let waterSurfaceMaterial = new THREE.MeshBasicMaterial( { color: 0x1133cc });
+        let waterSurfaceMesh = new THREE.Mesh(waterSurfaceGeom, waterSurfaceMaterial);
+        const waterPosition = polyDist * (polyAmount * 0.5);
+        waterSurfaceMesh.position.set(waterPosition, 0, waterPosition);
+        waterSurfaceMesh.rotation.x = Math.PI * -0.5;
+        chunkMesh.add(waterSurfaceMesh);
+
+        return chunkMesh;
+    };
+    
+    this.chunkView = new THREE.Group();
+    this.outerChunkView = new THREE.Group();
+    const testDist = 1024;
+    let someChunk = generateChunkMesh(testDist, 10, 0, 0);
+    this.chunkView.add(someChunk);
+    someChunk = generateChunkMesh(testDist, 10, testDist, 0);
+    someChunk.position.x = testDist;
+    this.chunkView.add(someChunk);
+    someChunk = generateChunkMesh(testDist, 10, 0, testDist);
+    someChunk.position.z = testDist;
+    this.chunkView.add(someChunk);
+    someChunk = generateChunkMesh(testDist, 10, testDist, testDist);
+    someChunk.position.x = testDist;
+    someChunk.position.z = testDist;
+    this.chunkView.add(someChunk);
+
+    this.outerChunkView.add(this.chunkView);
+    this.outerChunkView.scale.set(10, 1, 10);
+
+    this.threeScene.add(this.outerChunkView);
+};
 
 Gameplay.prototype.updateThreeScene = function () {
     const TEST_JUMP_HEIGHT = 25;
     this.sceneMeshData['player'].position.set(this.player.x, TEST_JUMP_HEIGHT * Math.sin(Math.abs(this.player.rotation) * 0.5), this.player.y);
-    this.sceneMeshData['player'].rotation.set(0, 0, this.player.rotation);
+    this.sceneMeshData['player'].rotation.set(0, this.playerAimDir.angle() * -1, this.player.rotation);
 
-    this.camera.position.set(GAME_WIDTH * 0.5, 350, GAME_HEIGHT * 0.5 + 25);
+    this.camera.position.set(GAME_WIDTH * 0.5, 200, GAME_HEIGHT * 0.5 + 400);
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
+
+    this.chunkView.position.set((-this.playerPosition.x * 2) - (GAME_WIDTH * 0.5), 0, (-this.playerPosition.y * 2) - (GAME_HEIGHT * 0.5));
+    this.outerChunkView.position.set(0, -48, 0);
+    this.outerChunkView.rotation.set(0, this.cameraFlightPathAngle + (Math.PI * 0.5), 0);
+    this.cameraFlightPathAngle = Phaser.Math.Angle.RotateTo(this.cameraFlightPathAngle, this.playerFlightPathDirection.angle(), 0.035);
 };
 Gameplay.prototype.setupEvents = function () {
 };
