@@ -69,6 +69,7 @@ Gameplay.prototype.preload = function () {
     this.load.json('formations', 'asset/formation/formations.json');
 
     this.load.binary('test_robot', 'asset/model/test_robot.glb');
+    this.load.binary('basic_enemy', 'asset/model/basic_enemy.glb');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -86,6 +87,28 @@ Gameplay.prototype.setupThreeBackground = function () {
 };
 Gameplay.prototype.initializeThreeScene = function () {
     const loader = new THREE.GLTFLoader();
+    let loadAndAppendModel = (root, modelName) => {
+        const robotModelData = this.cache.binary.get(modelName);
+        loader.parse(robotModelData, 'asset/model/', (gltfData) => {
+            root.add(gltfData.scene);
+            if (gltfData.animations.length > 0) {
+                let mixer = new THREE.AnimationMixer(gltfData.scene);
+                this.mixers.push(mixer);
+                root.animData = {};
+
+                gltfData.animations.forEach((anim) => {
+                    const action = mixer.clipAction(anim);
+                    root.animData[anim.name] = action;
+
+                    if (anim.name === 'idle') {
+                        action.play();
+                    } else {
+                        action.loop = THREE.LoopOnce;
+                    }
+                });
+            }
+        });
+    };
 
     // standard ambient lighting for principled BSDFs
     let l = new THREE.AmbientLight(0xFFFFFF);
@@ -100,36 +123,14 @@ Gameplay.prototype.initializeThreeScene = function () {
     this.threeScene.add(fieldMesh);
 
     let playerMesh = new THREE.Group();
+    loadAndAppendModel(playerMesh, 'test_robot');
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
-
-    const robotModelData = this.cache.binary.get('test_robot');
-    loader.parse(robotModelData, 'asset/model/', (gltfData) => {
-        playerMesh.add(gltfData.scene);
-        if (gltfData.animations.length > 0) {
-            let mixer = new THREE.AnimationMixer(gltfData.scene);
-            this.mixers.push(mixer);
-            this.player.animData = {};
-
-            gltfData.animations.forEach((anim) => {
-                const action = mixer.clipAction(anim);
-                this.player.animData[anim.name] = action;
-
-                if (anim.name === 'idle') {
-                    action.play();
-                } else {
-                    action.loop = THREE.LoopOnce;
-                }
-            });
-        }
-    });
-
-    let basicEnemyGeom = new THREE.BoxBufferGeometry(32, 32, 32);
-    let basicEnemyMat = new THREE.MeshBasicMaterial( { color: 0xBB2222 } );
-    let basicEnemyMesh = new THREE.Mesh(basicEnemyGeom, basicEnemyMat);
+    
     this.enemyMeshPool['basic'] = [];
     for (var i = 1; i < ENEMY_POOL_SIZE; i++) {
-        let c = basicEnemyMesh.clone();
+        let c = new THREE.Group();
+        loadAndAppendModel(c, 'basic_enemy');
         this.enemyMeshPool['basic'].push(c);
         this.threeScene.add(c);
         c.visible = false;
