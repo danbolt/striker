@@ -774,7 +774,19 @@ Gameplay.prototype.update = function () {
         enemy.y = pathPointCache.y + enemy.startOffset.y;
         if (enemy.mesh !== null) {
             enemy.mesh.position.set(enemy.x, 0, enemy.y);
+
+            if (enemy.pathPos < 1) {
+                const ox = pathPointCache.x;
+                const oy = pathPointCache.y;
+                enemy.path.getPoint(enemy.pathPos + 0.000001, pathPointCache);
+                pathPointCache.x -= ox;
+                pathPointCache.y -= oy;
+                enemy.mesh.rotation.set(0, -pathPointCache.angle() + (Math.PI * 0.5), 0);
+            } else {
+                enemy.mesh.rotation.set(0, 0, 0);
+            }
         }
+
 
         const inWorld = this.cameras.cameras[0].worldView.contains(enemy.x, enemy.y);
         if ((enemy.entering === false) && (inWorld === false)) {
