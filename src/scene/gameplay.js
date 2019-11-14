@@ -67,6 +67,8 @@ Gameplay.prototype.preload = function () {
     this.load.glsl('film_grain', 'asset/shader/film_grain.frag');
 
     this.load.json('formations', 'asset/formation/formations.json');
+
+    this.load.binary('test_robot', 'asset/model/test_robot.glb');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -97,15 +99,30 @@ Gameplay.prototype.initializeThreeScene = function () {
     fieldMesh.rotation.x = Math.PI * -0.5;
     this.threeScene.add(fieldMesh);
 
-    let cubeGeom = new THREE.BoxBufferGeometry( 16, 16, 16 );
-    let hitBoxGeom = new THREE.BoxBufferGeometry( 8, 24, 8 );
-    let cubeMat = new THREE.MeshBasicMaterial( { color: 0x00FF30 } );
-    let hitBoxMat = new THREE.MeshBasicMaterial( { color: 0x773302 } );
-    let playerMesh = new THREE.Mesh( cubeGeom, cubeMat );
-    let hitBoxMesh = new THREE.Mesh(hitBoxGeom, hitBoxMat);
-    playerMesh.add(hitBoxMesh);
+    let playerMesh = new THREE.Group();
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
+
+    const robotModelData = this.cache.binary.get('test_robot');
+    loader.parse(robotModelData, 'asset/model/', (gltfData) => {
+        playerMesh.add(gltfData.scene);
+        if (gltfData.animations.length > 0) {
+            let mixer = new THREE.AnimationMixer(gltfData.scene);
+            this.mixers.push(mixer);
+            this.player.animData = {};
+
+            gltfData.animations.forEach((anim) => {
+                const action = mixer.clipAction(anim);
+                this.player.animData[anim.name] = action;
+
+                if (anim.name === 'idle') {
+                    action.play();
+                } else {
+                    action.loop = THREE.LoopOnce;
+                }
+            });
+        }
+    });
 
     let basicEnemyGeom = new THREE.BoxBufferGeometry(32, 32, 32);
     let basicEnemyMat = new THREE.MeshBasicMaterial( { color: 0xBB2222 } );
@@ -204,7 +221,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 Gameplay.prototype.updateThreeScene = function () {
     const TEST_JUMP_HEIGHT = 25;
     this.sceneMeshData['player'].position.set(this.player.x, TEST_JUMP_HEIGHT * Math.sin(Math.abs(this.player.rotation) * 0.5), this.player.y);
-    this.sceneMeshData['player'].rotation.set(0, this.playerAimDir.angle() * -1, this.player.rotation);
+    this.sceneMeshData['player'].rotation.set(0, -this.playerAimDir.angle() + (Math.PI * 0.5), this.player.rotation);
 
     this.camera.position.set(GAME_WIDTH * 0.5, 200, GAME_HEIGHT * 0.5 + 400);
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
@@ -778,11 +795,11 @@ Gameplay.prototype.update = function () {
     };
     this.enemies.children.iterate(enemyIter);
 
-    //this.mixers.forEach((mixer) => {
-    //    // TODO: variable timestep this for lower framerates
-    //    const sixtyFramesPerSecond = 0.016;
-    //    mixer.update(sixtyFramesPerSecond);
-    //})
+    this.mixers.forEach((mixer) => {
+        // TODO: variable timestep this for lower framerates
+        const sixtyFramesPerSecond = 0.016;
+        mixer.update(sixtyFramesPerSecond);
+    })
     //this.uiScene.refreshUI(this.playerHealth, this.score);
 
 
