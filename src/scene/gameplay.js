@@ -135,7 +135,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     let basicSwordMat = new THREE.MeshBasicMaterial( { color: 0xFFFFFF , wireframe: true} );
     let swordColors = [0xFF0000, 0xFFFF00, 0x00FFFF, 0xaaccFF].map((col) => { return new THREE.Color(col); });
     let swordColorsIndex = 0;
-    this.time.addEvent({ delay: 20, callback: () => {
+    this.time.addEvent({ delay: 16, callback: () => {
         swordColorsIndex = (swordColorsIndex + 1) % swordColors.length;
         basicSwordMat.color = swordColors[swordColorsIndex];
     }, callbackScope: this, loop: true });
@@ -239,8 +239,8 @@ Gameplay.prototype.updateThreeScene = function () {
     this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
     this.sceneMeshData['player'].rotation.set(0, Math.PI, 0);
 
-    this.camera.position.set(GAME_WIDTH * 0.5, 200, GAME_HEIGHT * 0.5 + 400);
-    this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
+    this.camera.position.set(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 200, GAME_HEIGHT * 0.5 + 300 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
+    this.camera.lookAt(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 0, GAME_HEIGHT * 0.5 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
 
     this.chunkView.position.set((-this.playerPosition.x * 2) - (GAME_WIDTH * 0.5), 0, (-this.playerPosition.y * 2) - (GAME_HEIGHT * 0.5));
     this.outerChunkView.position.set(0, -96, 0);
