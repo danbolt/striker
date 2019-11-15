@@ -82,15 +82,7 @@ InGameUI.prototype.create = function () {
   this.showMapKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
   this.commitDirectionKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
-  this.debugHealthText = this.add.dynamicBitmapText(16, 16, 'century', '');
-  this.debugHealthText.setDisplayCallback(function (data) {
-
-    data.x = data.x + (Math.random() * 0.5)
-    data.y = data.y + (Math.random() * 0.5)
-    data.scale = 1.0 + (Math.random() * 0.025);
-
-    return data;
-  });
+  this.debugHealthText = this.add.bitmapText(16, 16, 'century', '');
   this.debugHealthText.scaleX = 0.89;
   this.refreshUI(PLAYER_MAX_HEALTH);
 

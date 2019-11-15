@@ -833,7 +833,7 @@ Gameplay.prototype.update = function () {
         const sixtyFramesPerSecond = 0.016;
         mixer.update(sixtyFramesPerSecond);
     })
-    //this.uiScene.refreshUI(this.playerHealth, this.score);
+    this.uiScene.refreshUI(this.playerHealth, this.score);
 
 
     this.updateWorld();
