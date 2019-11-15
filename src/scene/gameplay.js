@@ -176,63 +176,117 @@ Gameplay.prototype.initializeThreeScene = function () {
     // TODO: data this
     this.sceneNoise = new SimplexNoise(Math);
 
-    let generateChunkMesh = (size, sections, chunkOffsetX, chunkOffsetY) => {
-        const polyDist = size / sections;
-        const polyAmount = sections;
-        var chunkGeom = new THREE.Geometry();
-        let iterVal = 0;
-        const scale = 0.25;
-        for (var x = 0; x < polyAmount; x++) {
-            for (var y = 0; y < polyAmount; y++) {
-                let northWestValue = this.sceneNoise.noise((chunkOffsetX + x * polyDist) * scale, (chunkOffsetY + y * polyDist) * scale);
-                let northEastValue = this.sceneNoise.noise((chunkOffsetX + (x + 1) * polyDist) * scale, (chunkOffsetY + y * polyDist) * scale);
-                let southEastValue = this.sceneNoise.noise((chunkOffsetX + x * polyDist) * scale, (chunkOffsetY + (y + 1) * polyDist) * scale);
-                let southWestValue = this.sceneNoise.noise((chunkOffsetX + (x + 1) * polyDist) * scale, (chunkOffsetY + (y + 1) * polyDist) * scale);
-                chunkGeom.vertices.push(new THREE.Vector3(x * polyDist      , northWestValue * 64, y * polyDist),
-                                        new THREE.Vector3((x + 1) * polyDist, northEastValue * 64, y * polyDist),
-                                        new THREE.Vector3(x * polyDist      , southEastValue * 64, (y + 1) * polyDist),
-                                        new THREE.Vector3((x + 1) * polyDist, southWestValue * 64, (y + 1) * polyDist));
+    let sceneryVertShader = `
+    precision mediump float;
 
-                chunkGeom.faces.push(new THREE.Face3(iterVal + 1, iterVal, iterVal + 2))
-                chunkGeom.faces.push(new THREE.Face3(iterVal + 1, iterVal + 2, iterVal + 3))
-                iterVal += 4;
-            }
-        }
-        chunkGeom.computeBoundingSphere();
-
-        let chunkMat = new THREE.MeshBasicMaterial( { color: 0x113322 } );
-        let chunkMesh = new THREE.Mesh( chunkGeom, chunkMat );
-        let waterSurfaceGeom = new THREE.PlaneBufferGeometry(polyDist * polyAmount, polyDist * polyAmount, 1);
-        let waterSurfaceMaterial = new THREE.MeshBasicMaterial( { color: 0x1133cc });
-        let waterSurfaceMesh = new THREE.Mesh(waterSurfaceGeom, waterSurfaceMaterial);
-        const waterPosition = polyDist * (polyAmount * 0.5);
-        waterSurfaceMesh.position.set(waterPosition, 0, waterPosition);
-        waterSurfaceMesh.rotation.x = Math.PI * -0.5;
-        chunkMesh.add(waterSurfaceMesh);
-
-        return chunkMesh;
-    };
+    uniform vec2 flyOffset;
     
-    this.chunkView = new THREE.Group();
-    this.outerChunkView = new THREE.Group();
-    const testDist = 1024;
-    let someChunk = generateChunkMesh(testDist, 10, 0, 0);
-    this.chunkView.add(someChunk);
-    someChunk = generateChunkMesh(testDist, 10, testDist, 0);
-    someChunk.position.x = testDist;
-    this.chunkView.add(someChunk);
-    someChunk = generateChunkMesh(testDist, 10, 0, testDist);
-    someChunk.position.z = testDist;
-    this.chunkView.add(someChunk);
-    someChunk = generateChunkMesh(testDist, 10, testDist, testDist);
-    someChunk.position.x = testDist;
-    someChunk.position.z = testDist;
-    this.chunkView.add(someChunk);
+    float rand(float n){return fract(sin(n) * 43758.5453123);}
 
-    this.outerChunkView.add(this.chunkView);
-    this.outerChunkView.scale.set(10, 1, 10);
+    float noise(float p){
+        float fl = floor(p);
+        float fc = fract(p);
+        return mix(rand(fl), rand(fl + 1.0), fc);
+    }
 
-    this.threeScene.add(this.outerChunkView);
+    float rand(vec2 n) { 
+        return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+    }
+
+    float noise(vec2 p){
+        vec2 ip = floor(p);
+        vec2 u = fract(p);
+        u = u*u*(3.0-2.0*u);
+
+        float res = mix(
+        mix(rand(ip),rand(ip+vec2(1.0,0.0)),u.x),
+        mix(rand(ip+vec2(0.0,1.0)),rand(ip+vec2(1.0,1.0)),u.x),u.y);
+        return res*res;
+    }
+
+    varying float noiseVal;
+    varying float waterHeight;
+
+    varying vec2 positionInWorld;
+
+    float sampleRandomWorldAt(vec2 pos) {
+        float scale = 0.035;
+
+        return noise(pos * scale);
+    }
+
+    void main() {
+        float heightVal = 96.0;
+        waterHeight = 0.45;
+
+        vec4 modelPos = vec4( position, 1.0 );
+        vec4 worldPos = modelMatrix * modelPos;
+        noiseVal = sampleRandomWorldAt(worldPos.xz + flyOffset);
+        positionInWorld = worldPos.xz + flyOffset;
+        float scaledNoise = max((noiseVal * heightVal), waterHeight * heightVal);
+
+        vec4 posCandidate =  projectionMatrix * modelViewMatrix * modelPos;
+        gl_Position = vec4(posCandidate.x, posCandidate.y + scaledNoise, posCandidate.z, posCandidate.w);
+
+    }
+    `;
+    let sceneryFragShader = `
+    precision mediump float;
+    
+    varying float noiseVal;
+    varying float waterHeight;
+
+    uniform vec2 flyOffset;
+
+    varying vec2 positionInWorld;
+
+    float rand(float n){return fract(sin(n) * 17858.5453123);}
+
+    float noise(float p){
+    float fl = floor(p);
+        float fc = fract(p);
+        return mix(rand(fl), rand(fl + 1.0), fc);
+    }
+
+    float rand(vec2 n) { 
+        return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+    }
+
+    float noise(vec2 p){
+        vec2 ip = floor(p);
+        vec2 u = fract(p);
+        u = u*u*(3.0-2.0*u);
+
+        float res = mix(
+        mix(rand(ip),rand(ip+vec2(1.0,0.0)),u.x),
+        mix(rand(ip+vec2(0.0,1.0)),rand(ip+vec2(1.0,1.0)),u.x),u.y);
+        return res*res;
+    }
+
+    void main() {
+        vec4 landColor = vec4(0.0, 0.7, 0.0, 1.0);
+        vec4 landColor2 = vec4(0.0, 0.4, 0.1, 1.0);
+        vec4 seaColor = vec4(0.0, 0.0, 0.5, 1.0);
+        vec4 seaColor2 = vec4(0.0, 0.6, 0.9, 1.0);
+
+        if (noiseVal > waterHeight) {
+            float val = noise(positionInWorld * 1.0);
+            gl_FragColor = (val * landColor) + ((1.0 - val) * landColor2);
+        } else {
+            float val = noise(positionInWorld * 0.1);
+            gl_FragColor = (val * seaColor) + ((1.0 - val) * seaColor2);
+        }
+    }
+    `;
+    let floorPlane = new THREE.PlaneBufferGeometry(2500, 2500, 300, 300);
+    let floorMat = new THREE.ShaderMaterial( { uniforms: { flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
+    //floorMat.fog = true;
+    let floor = new THREE.Mesh(floorPlane, floorMat);
+    floor.rotation.x = Math.PI * -0.5;
+    floor.position.set(GAME_WIDTH * 0.5, -100, GAME_HEIGHT * 0.5);
+    this.threeScene.add(floor);
+    this.groundBackdrop = floor;
+    this.groundMat = floorMat;
 };
 
 Gameplay.prototype.updateThreeScene = function () {
@@ -242,10 +296,10 @@ Gameplay.prototype.updateThreeScene = function () {
     this.camera.position.set(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 200, GAME_HEIGHT * 0.5 + 300 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
     this.camera.lookAt(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 0, GAME_HEIGHT * 0.5 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
 
-    this.chunkView.position.set((-this.playerPosition.x * 2) - (GAME_WIDTH * 0.5), 0, (-this.playerPosition.y * 2) - (GAME_HEIGHT * 0.5));
-    this.outerChunkView.position.set(0, -96, 0);
-    this.outerChunkView.rotation.set(0, this.cameraFlightPathAngle + (Math.PI * 0.5), 0);
     this.cameraFlightPathAngle = Phaser.Math.Angle.RotateTo(this.cameraFlightPathAngle, this.playerFlightPathDirection.angle(), 0.035);
+    this.groundBackdrop.rotation.z = this.cameraFlightPathAngle;
+    this.groundMat.uniforms.flyOffset.value.x = this.playerPosition.x;
+    this.groundMat.uniforms.flyOffset.value.y = this.playerPosition.y;
 };
 Gameplay.prototype.setupEvents = function () {
 };
