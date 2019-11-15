@@ -10,6 +10,7 @@ let InGameUI = function () {
 };
 InGameUI.prototype.preload = function () {
     this.load.bitmapFont('newsgeek', 'asset/font/newsgeek.png', 'asset/font/newsgeek.fnt');
+    this.load.bitmapFont('century', 'asset/font/century_0.png', 'asset/font/century.fnt');
 
     this.load.glsl('scanlines', 'asset/shader/scanlines.frag');
 };
@@ -27,7 +28,7 @@ InGameUI.prototype.returnPlayerHealth = function(health, maxHealth) {
   return returnValue;
 }
 InGameUI.prototype.refreshUI = function(playerHealth) {
-  this.debugHealthText.text = 'BARRIER\n  ' + this.returnPlayerHealth(playerHealth, PLAYER_MAX_HEALTH)  + '\n\n\nSHIELD\n  <> <> <>';
+  this.debugHealthText.text = 'BARRIER\n  ' + this.returnPlayerHealth(playerHealth, PLAYER_MAX_HEALTH);
 };
 InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
   worldSize = (worldSize === undefined) ? new Phaser.Math.Vector2(1000, 1000) : worldSize;
@@ -81,7 +82,16 @@ InGameUI.prototype.create = function () {
   this.showMapKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
   this.commitDirectionKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
 
-  this.debugHealthText = this.add.bitmapText(16, 16, 'newsgeek', '');
+  this.debugHealthText = this.add.dynamicBitmapText(16, 16, 'century', '');
+  this.debugHealthText.setDisplayCallback(function (data) {
+
+    data.x = data.x + (Math.random() * 0.5)
+    data.y = data.y + (Math.random() * 0.5)
+    data.scale = 1.0 + (Math.random() * 0.025);
+
+    return data;
+  });
+  this.debugHealthText.scaleX = 0.89;
   this.refreshUI(PLAYER_MAX_HEALTH);
 
   this.gameplayScene = this.scene.get('Gameplay');
@@ -143,6 +153,7 @@ InGameUI.prototype.create = function () {
   let sceneShader = this.add.shader('scanlines', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
 };
 InGameUI.prototype.update = function () {
+  this.debugHealthText.y = this.debugHealthText = 15.5 + (Math.random() * 0.5);
   let pad = null;
   if (this.input.gamepad && (this.input.gamepad.total > 0)) {
     pad = this.input.gamepad.getPad(0);
