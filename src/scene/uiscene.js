@@ -10,6 +10,8 @@ let InGameUI = function () {
 };
 InGameUI.prototype.preload = function () {
     this.load.bitmapFont('newsgeek', 'asset/font/newsgeek.png', 'asset/font/newsgeek.fnt');
+
+    this.load.glsl('scanlines', 'asset/shader/scanlines.frag');
 };
 InGameUI.prototype.returnPlayerHealth = function(health, maxHealth) {
   let returnValue = '';
@@ -137,6 +139,8 @@ InGameUI.prototype.create = function () {
 
   this.aimDirection.x = 0.0;
   this.aimDirection.y = 0.0;
+
+  let sceneShader = this.add.shader('scanlines', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
 };
 InGameUI.prototype.update = function () {
   let pad = null;

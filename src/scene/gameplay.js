@@ -55,6 +55,7 @@ Gameplay.prototype.init = function () {
     this.keys.upAimArrow = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
     this.keys.aKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.keys.bKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.keys.cKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
     this.keys.rKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.keys.lKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
@@ -140,6 +141,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     let basicBulletMat = new THREE.MeshBasicMaterial( { color: 0x88FF88 } );
     let basicEnemyBulletMat = new THREE.MeshBasicMaterial( { color: 0xcccc00 } );
     let basicBulletMesh = new THREE.Mesh(basicBulletGeom, basicBulletMat);
+    basicBulletMesh.scale.z = 2.3;
     this.bulletMeshPool['bullet'] = [];
     for (var i = 0; i < PLAYER_BULLET_POOL_SIZE; i++) {
         let c = basicBulletMesh.clone();
@@ -220,15 +222,14 @@ Gameplay.prototype.initializeThreeScene = function () {
 };
 
 Gameplay.prototype.updateThreeScene = function () {
-    const TEST_JUMP_HEIGHT = 25;
-    this.sceneMeshData['player'].position.set(this.player.x, TEST_JUMP_HEIGHT * Math.sin(Math.abs(this.player.rotation) * 0.5), this.player.y);
-    this.sceneMeshData['player'].rotation.set(0, -this.playerAimDir.angle() + (Math.PI * 0.5), this.player.rotation);
+    this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
+    this.sceneMeshData['player'].rotation.set(0, Math.PI, 0);
 
     this.camera.position.set(GAME_WIDTH * 0.5, 200, GAME_HEIGHT * 0.5 + 400);
     this.camera.lookAt(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
 
     this.chunkView.position.set((-this.playerPosition.x * 2) - (GAME_WIDTH * 0.5), 0, (-this.playerPosition.y * 2) - (GAME_HEIGHT * 0.5));
-    this.outerChunkView.position.set(0, -48, 0);
+    this.outerChunkView.position.set(0, -96, 0);
     this.outerChunkView.rotation.set(0, this.cameraFlightPathAngle + (Math.PI * 0.5), 0);
     this.cameraFlightPathAngle = Phaser.Math.Angle.RotateTo(this.cameraFlightPathAngle, this.playerFlightPathDirection.angle(), 0.035);
 };
@@ -252,10 +253,12 @@ Gameplay.prototype.initializePlayer = function () {
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.player.setVisible(false);
     this.canShoot = true;
-    this.player.canDodge = true;
     this.physics.add.existing(this.player);
     this.player.body.setSize(8, 8, true);
     this.player.dodging = false;
+    this.player.canDodge = true;
+    this.player.striking = false;
+    this.player.canStrike = true;
     this.time.addEvent({ delay: PLAYER_SHOT_DELAY_MS, callback: () => { this.canShoot = true; }, callbackScope: this, loop: true });
 };
 Gameplay.prototype.initializeEnemies = function() {
@@ -647,7 +650,8 @@ Gameplay.prototype.update = function () {
             }
         }
 
-        // aiming
+        // Twin-stick style aiming
+        /*
         if (this.keys.rightAimArrow.isDown) {
             this.playerAimDir.x = 1;
         } else if (this.keys.leftAimArrow.isDown) {
@@ -665,6 +669,7 @@ Gameplay.prototype.update = function () {
               this.playerAimDir.y = pad.rightStick.y;
             }
         }
+        */
         this.playerAimDir.normalize();
 
         // shooting
@@ -673,14 +678,14 @@ Gameplay.prototype.update = function () {
                 spawnBullet();
                 this.canShoot = false;
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).R2 || this.input.gamepad.getPad(0).R1)) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).B || this.input.gamepad.getPad(0).R1)) {
                 shoot();
             } else if (this.keys.aKey.isDown) {
                 shoot();
             }
         }
 
-        if ((this.player.dodging === false) && (this.player.canDodge === true)) {
+        if ((this.player.dodging === false) && (this.player.canDodge === true) && (this.player.striking === false)) {
             let dodge = () => {
                 this.player.dodging = true;
                 this.player.canDodge = false;
@@ -691,18 +696,33 @@ Gameplay.prototype.update = function () {
                 this.time.delayedCall(PLAYER_DODGE_RECHARGE_TIME_MS, () => {
                     this.player.canDodge = true;
                 });
-
-                let tweenPivotDir = 1;
-                if (this.player.body.velocity.x < 0) {
-                    tweenPivotDir = -1;
-                }
-
-                this.add.tween({ targets: this.player, duration: PLAYER_DODGE_TIME_MS, rotation: (Math.PI * 2 * tweenPivotDir), onComplete: () => { this.player.rotation = 0; } })
             };
             if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).A || this.input.gamepad.getPad(0).L1)) {
                 dodge();
             } else if (this.keys.bKey.isDown) {
                 dodge();
+            }
+        }
+
+        if ((this.player.striking === false) && (this.player.canStrike === true) && (this.player.dodging === false)) {
+            let strike = () => {
+                this.player.striking = true;
+                this.player.canStrike = false;
+                this.player.canDodge = false;
+
+                this.time.delayedCall(PLAYER_DODGE_TIME_MS, () => {
+                    this.player.striking = false;
+                });
+                this.time.delayedCall(PLAYER_DODGE_RECHARGE_TIME_MS, () => {
+                    this.player.canStrike = true;
+                });
+
+                this.sceneMeshData['player'].animData['strike'].reset().play();
+            };
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).Y || this.input.gamepad.getPad(0).L2)) {
+                strike();
+            } else if (this.keys.cKey.isDown) {
+                strike();
             }
         }
     };
