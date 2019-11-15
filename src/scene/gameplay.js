@@ -97,6 +97,9 @@ Gameplay.prototype.initializeThreeScene = function () {
                 this.mixers.push(mixer);
                 root.animData = {};
 
+                let skeletonData = new THREE.SkeletonHelper(gltfData.scene);
+                root.boneData = skeletonData.bones;
+
                 gltfData.animations.forEach((anim) => {
                     const action = mixer.clipAction(anim);
                     root.animData[anim.name] = action;
@@ -127,6 +130,17 @@ Gameplay.prototype.initializeThreeScene = function () {
     loadAndAppendModel(playerMesh, 'test_robot');
     this.threeScene.add(playerMesh);
     this.sceneMeshData['player'] = playerMesh;
+
+    let basicSwordGeom = new THREE.BoxBufferGeometry(8, 64, 8);
+    let basicSwordMat = new THREE.MeshBasicMaterial( { color: 0xFFFFFF , wireframe: true} );
+    let swordColors = [0xFF0000, 0xFFFF00, 0x00FFFF, 0xaaccFF].map((col) => { return new THREE.Color(col); });
+    let swordColorsIndex = 0;
+    this.time.addEvent({ delay: 20, callback: () => {
+        swordColorsIndex = (swordColorsIndex + 1) % swordColors.length;
+        basicSwordMat.color = swordColors[swordColorsIndex];
+    }, callbackScope: this, loop: true });
+    let basicSwordMesh = new THREE.Mesh(basicSwordGeom, basicSwordMat);
+    this.sceneMeshData['sword'] = basicSwordMesh;
     
     this.enemyMeshPool['basic'] = [];
     for (var i = 1; i < ENEMY_POOL_SIZE; i++) {
@@ -260,6 +274,15 @@ Gameplay.prototype.initializePlayer = function () {
     this.player.striking = false;
     this.player.canStrike = true;
     this.time.addEvent({ delay: PLAYER_SHOT_DELAY_MS, callback: () => { this.canShoot = true; }, callbackScope: this, loop: true });
+
+    this.playerSword = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
+    this.playerSword.setVisible(false);
+    this.physics.add.existing(this.playerSword);
+    this.playerSword.body.setSize(8, 96, true);
+    this.playerSword.rotation = 0.45;
+    this.playerSword.x = -19999;
+    this.playerSword.y = -999999;
+    this.playerSword.moves = true;
 };
 Gameplay.prototype.initializeEnemies = function() {
     this.enemies = this.add.group();
@@ -386,6 +409,30 @@ Gameplay.prototype.initializeCollisions = function () {
         bullet.y = -9999;
     }, (bullet, enemy) => { return enemy.active; });
 
+    this.physics.add.overlap(this.playerSword, this.enemies, (sword, enemy) => {
+        const squad = this.squads[enemy.squadIndex];
+        if (squad === null) {
+            this.enemies.killAndHide(enemy);
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
+            enemy.x = -99999;
+            enemy.y = -99999;
+            return;
+        }
+        squad.health_data[enemy.shipIndex] = 0;
+
+        if (squad.health_data[enemy.shipIndex] <= 0) {
+            squad.onscreen_ships--;
+            this.enemies.killAndHide(enemy);
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
+            enemy.x = -99999;
+            enemy.y = -99999;
+        }
+    }, (sword, enemy) => { return enemy.active; });
+
     this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
 
         this.enemyBullets.killAndHide(enemyBullet);
@@ -395,6 +442,7 @@ Gameplay.prototype.initializeCollisions = function () {
         this.playerHealth -= ENEMY_BULLET_DAMAGE;
         if (this.playerHealth <= 0) {
             this.player.setActive(false);
+            this.sceneMeshData['player'].visible = false;
         }
 
         this.uiScene.refreshUI(this.playerHealth, this.score);
@@ -418,6 +466,7 @@ Gameplay.prototype.initializeCollisions = function () {
         this.playerHealth -= ENEMY_COLLIDE_DAMAGE;
         if (this.playerHealth <= 0) {
             this.player.setActive(false);
+            this.sceneMeshData['player'].visible = false;
         }
 
         this.uiScene.refreshUI(this.playerHealth, this.score);
@@ -717,7 +766,33 @@ Gameplay.prototype.update = function () {
                     this.player.canStrike = true;
                 });
 
+                let sword = this.sceneMeshData['sword'];
+                sword.position.y = 48;
+                sword.visible = true;
+                this.sceneMeshData['player'].animData['strike'].setDuration(PLAYER_STRIKE_TIME);
+                this.sceneMeshData['player'].animData['idle'].stop();
                 this.sceneMeshData['player'].animData['strike'].reset().play();
+                this.time.delayedCall(PLAYER_STRIKE_TIME * 1000, () => {
+                    this.sceneMeshData['player'].animData['idle'].play();
+                    sword.visible = false;
+                })
+
+                if (this.sceneMeshData['player'].swordBone === undefined) {
+                    this.sceneMeshData['player'].boneData.forEach(function (bone) {
+                        if (bone.name === 'SwordHand') {
+                            this.sceneMeshData['player'].swordBone = bone;
+                        }
+                    }, this);
+                }
+                this.sceneMeshData['player'].swordBone.add(sword);
+
+                this.playerSword.x = this.player.x - 32;
+                this.playerSword.y = this.player.y - 32;
+                let comp = () => {
+                    this.playerSword.x = -19999;
+                    this.playerSword.y = -19999;
+                };
+                let t = this.add.tween({ targets: this.playerSword, duration: (PLAYER_STRIKE_TIME * 1000), x: this.player.x + 32, y: this.player.y - 32 , onComplete: comp});
             };
             if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).Y || this.input.gamepad.getPad(0).L2)) {
                 strike();

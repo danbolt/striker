@@ -14,21 +14,22 @@ InGameUI.prototype.preload = function () {
 
     this.load.glsl('scanlines', 'asset/shader/scanlines.frag');
 };
+const filled = ['▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒'];
 InGameUI.prototype.returnPlayerHealth = function(health, maxHealth) {
   let returnValue = '';
 
   for (var i = 0; i < maxHealth; i++) {
     if (i < health) {
-      returnValue += '/';
+      returnValue += filled[~~(Math.random() * filled.length)];
     } else {
-      returnValue += '=';
+      returnValue += '░';
     }
   }
 
   return returnValue;
 }
 InGameUI.prototype.refreshUI = function(playerHealth) {
-  this.debugHealthText.text = 'BARRIER\n  ' + this.returnPlayerHealth(playerHealth, PLAYER_MAX_HEALTH);
+  this.debugHealthText.text =  'BARRIER\n  ' + this.returnPlayerHealth(playerHealth, PLAYER_MAX_HEALTH);
 };
 InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
   worldSize = (worldSize === undefined) ? new Phaser.Math.Vector2(1000, 1000) : worldSize;
@@ -145,7 +146,6 @@ InGameUI.prototype.create = function () {
   let sceneShader = this.add.shader('scanlines', GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, GAME_WIDTH, GAME_HEIGHT);
 };
 InGameUI.prototype.update = function () {
-  this.debugHealthText.y = this.debugHealthText = 15.5 + (Math.random() * 0.5);
   let pad = null;
   if (this.input.gamepad && (this.input.gamepad.total > 0)) {
     pad = this.input.gamepad.getPad(0);
