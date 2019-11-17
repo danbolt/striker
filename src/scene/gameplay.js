@@ -118,8 +118,8 @@ Gameplay.prototype.initializeThreeScene = function () {
     let l = new THREE.AmbientLight(0xFFFFFF);
     this.threeScene.add(l);
 
-    let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 2, 2 );
-    let fieldMat = new THREE.MeshBasicMaterial( { color: 0x005555 } );
+    let fieldGeom = new THREE.PlaneBufferGeometry( GAME_WIDTH, GAME_HEIGHT, 1, 1 );
+    let fieldMat = new THREE.MeshBasicMaterial( { color: 0xFF00FF } );
     fieldMat.wireframe = true;
     let fieldMesh = new THREE.Mesh( fieldGeom, fieldMat );
     fieldMesh.position.set(GAME_WIDTH * 0.5, 0, GAME_HEIGHT * 0.5);
@@ -180,6 +180,18 @@ Gameplay.prototype.initializeThreeScene = function () {
     precision mediump float;
 
     uniform vec2 flyOffset;
+    uniform float flyAngle;
+
+    const float PI = 3.1415926535897932384626433832795;
+    const float PI_2 = 1.57079632679489661923;
+    const float PI_4 = 0.785398163397448309616;
+
+    vec2 rotate(vec2 v, float a) {
+        float s = sin(a);
+        float c = cos(a);
+        mat2 m = mat2(c, -s, s, c);
+        return m * v;
+    }
     
     float rand(float n){return fract(sin(n) * 43758.5453123);}
 
@@ -216,13 +228,12 @@ Gameplay.prototype.initializeThreeScene = function () {
     }
 
     void main() {
-        float heightVal = 96.0;
+        float heightVal = 128.0;
         waterHeight = 0.45;
 
         vec4 modelPos = vec4( position, 1.0 );
-        vec4 worldPos = modelMatrix * modelPos;
-        noiseVal = sampleRandomWorldAt(worldPos.xz + flyOffset);
-        positionInWorld = worldPos.xz + flyOffset;
+        positionInWorld = flyOffset + rotate(modelPos.xy, flyAngle + PI_2);
+        noiseVal = sampleRandomWorldAt(positionInWorld);
         float scaledNoise = max((noiseVal * heightVal), waterHeight * heightVal);
 
         vec4 posCandidate =  projectionMatrix * modelViewMatrix * modelPos;
@@ -279,7 +290,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     }
     `;
     let floorPlane = new THREE.PlaneBufferGeometry(2500, 2500, 300, 300);
-    let floorMat = new THREE.ShaderMaterial( { uniforms: { flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
+    let floorMat = new THREE.ShaderMaterial( { uniforms: { flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
     //floorMat.fog = true;
     let floor = new THREE.Mesh(floorPlane, floorMat);
     floor.rotation.x = Math.PI * -0.5;
@@ -293,13 +304,17 @@ Gameplay.prototype.updateThreeScene = function () {
     this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
     this.sceneMeshData['player'].rotation.set(0, Math.PI, 0);
 
-    this.camera.position.set(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 200, GAME_HEIGHT * 0.5 + 300 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
+    const cameraYDist = 300;
+    const cameraZDist = 200;
+
+    this.camera.position.set(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), cameraYDist, GAME_HEIGHT * 0.5 + cameraZDist + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
     this.camera.lookAt(GAME_WIDTH * 0.5 + ((this.player.x / GAME_WIDTH) * (GAME_WIDTH * 0.3) - (GAME_WIDTH * 0.15)), 0, GAME_HEIGHT * 0.5 + ((this.player.y / GAME_HEIGHT) * (GAME_HEIGHT * 0.3) - (GAME_HEIGHT * 0.15)));
 
-    this.cameraFlightPathAngle = Phaser.Math.Angle.RotateTo(this.cameraFlightPathAngle, this.playerFlightPathDirection.angle(), 0.035);
-    this.groundBackdrop.rotation.z = this.cameraFlightPathAngle;
     this.groundMat.uniforms.flyOffset.value.x = this.playerPosition.x;
     this.groundMat.uniforms.flyOffset.value.y = this.playerPosition.y;
+
+    // This looks odd, but phaser's positive Y axis is in a different direction than three.js
+    this.groundMat.uniforms.flyAngle.value = Math.atan2(Math.sin(this.cameraFlightPathAngle) * -1, Math.cos(this.cameraFlightPathAngle));
 };
 Gameplay.prototype.setupEvents = function () {
 };
@@ -309,6 +324,18 @@ Gameplay.prototype.updateFlightPath = function (newDir) {
     this.playerFlightPathDirection.x = newDir.x;
     this.playerFlightPathDirection.y = newDir.y;
     this.playerFlightPathDirection.normalize();
+
+
+    const currentAngle = this.cameraFlightPathAngle;
+    const targetAngle = this.playerFlightPathDirection.angle();
+    const minimumDistance = ((targetAngle - currentAngle) + Math.PI) % (Math.PI * 2) - Math.PI;
+    let t = this.add.tween({
+        targets: this,
+        duration: 4376,
+        cameraFlightPathAngle: (currentAngle + minimumDistance),
+        ease: Phaser.Math.Easing.Elastic.Out,
+        easeParams: [0.0001, 1.0]
+    });
 };
 Gameplay.prototype.getFlightPath = function() {
     return this.playerFlightPathDirection;
@@ -317,7 +344,7 @@ Gameplay.prototype.getFlightPath = function() {
 Gameplay.prototype.initializePlayer = function () {
     this.playerPosition = new Phaser.Math.Vector2(this.worldSize.x * 0.5, this.worldSize.y * 0.5);
 
-    this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
+    this.player = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.75, 'test_sheet', 0);
     this.playerHealth = PLAYER_MAX_HEALTH;
     this.player.setVisible(false);
     this.canShoot = true;
@@ -638,11 +665,11 @@ Gameplay.prototype.updateWorld = function () {
     // If we've left the world bounds, turn around
     if ((this.playerPosition.x < 0) || (this.playerPosition.x > this.worldSize.x)) {
         this.playerPosition.x = Phaser.Math.Clamp(this.playerPosition.x, 0, this.worldSize.x);
-        this.playerFlightPathDirection.x *= -1;
+        this.updateFlightPath( {x: (this.playerFlightPathDirection.x * -1), y: this.playerFlightPathDirection.y} );
     }
     if ((this.playerPosition.y < 0) || (this.playerPosition.y > this.worldSize.y)) {
         this.playerPosition.y = Phaser.Math.Clamp(this.playerPosition.y, 0, this.worldSize.y);
-        this.playerFlightPathDirection.y *= -1;
+        this.updateFlightPath( {x: this.playerFlightPathDirection.x, y: (this.playerFlightPathDirection.y * -1)} );
     }
 
     // TODO: Spatial sorting of squads for faster distance-checking
