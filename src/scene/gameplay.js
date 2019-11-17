@@ -247,7 +247,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
     void main() {
         float heightVal = 256.0;
-        waterHeight = 0.45;
+        waterHeight = 0.2;
 
         vec4 modelPos = vec4( position, 1.0 );
         positionInWorld = flyOffset + rotate(modelPos.xy * worldScale, flyAngle + PI_2);
@@ -302,7 +302,7 @@ Gameplay.prototype.initializeThreeScene = function () {
         vec4 seaColor2 = vec4(0.27 * 0.5, 0.68 * 0.5, 0.74 * 0.5, 1.0);
 
         float val = noise(positionInWorld * 1.0);
-        if ((noiseVal) > (waterHeight + 0.1)) {
+        if ((noiseVal) > (waterHeight + 0.2)) {
             gl_FragColor = (val * landColor3) + ((1.0 - val) * landColor4);
         } else if (noiseVal > waterHeight) {
             gl_FragColor = (val * landColor) + ((1.0 - val) * landColor2);
