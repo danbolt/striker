@@ -187,6 +187,8 @@ Gameplay.prototype.initializeThreeScene = function () {
     const float PI_2 = 1.57079632679489661923;
     const float PI_4 = 0.785398163397448309616;
 
+    const vec3 sunshineRay = normalize(vec3(2.0, -1.0, 0.75));
+
     vec2 rotate(vec2 v, float a) {
         float s = sin(a);
         float c = cos(a);
@@ -232,6 +234,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     varying float waterHeight;
 
     varying vec2 positionInWorld;
+    varying float vertexLambert;
 
     float sampleRandomWorldAt(vec2 pos) {
         float scale = 0.035;
@@ -257,6 +260,19 @@ Gameplay.prototype.initializeThreeScene = function () {
         vec4 posCandidate =  projectionMatrix * modelViewMatrix * modelPos;
         gl_Position = vec4(posCandidate.x, posCandidate.y + scaledNoise, posCandidate.z, posCandidate.w);
 
+
+        float noiseDetla = 0.1;
+        vec3 noisePos = vec3(positionInWorld.x, noiseVal * 2.0, positionInWorld.y);
+        vec3 xOffsetPos = noisePos + vec3(noiseDetla, 0.0, 0.0);
+        vec3 yOffsetPos = noisePos + vec3(0.0, 0.0, noiseDetla);
+        xOffsetPos.y = sampleMapDataAt(xOffsetPos.xz) * 2.0;
+        yOffsetPos.y = sampleMapDataAt(yOffsetPos.xz) * 2.0;
+        vec3 xGrad = xOffsetPos - noisePos;
+        vec3 yGrad = yOffsetPos - noisePos;
+        vec3 positionNormal = normalize(cross(yGrad, xGrad));
+
+        float lambertDotProduct = dot(sunshineRay, positionNormal);
+        vertexLambert = max(0.045, lambertDotProduct) * 1.14;
     }
     `;
     let sceneryFragShader = `
@@ -264,6 +280,8 @@ Gameplay.prototype.initializeThreeScene = function () {
     
     varying float noiseVal;
     varying float waterHeight;
+
+    varying float vertexLambert;
 
     uniform vec2 flyOffset;
     uniform sampler2D mapData;
@@ -301,6 +319,7 @@ Gameplay.prototype.initializeThreeScene = function () {
         vec4 seaColor = vec4(0.23, 0.41, 0.45, 1.0);
         vec4 seaColor2 = vec4(0.27 * 0.5, 0.68 * 0.5, 0.74 * 0.5, 1.0);
 
+        
         float val = noise(positionInWorld * 1.0);
         if ((noiseVal) > (waterHeight + 0.2)) {
             gl_FragColor = (val * landColor3) + ((1.0 - val) * landColor4);
@@ -309,6 +328,8 @@ Gameplay.prototype.initializeThreeScene = function () {
         } else {
             gl_FragColor = (val * seaColor) + ((1.0 - val) * seaColor2);
         }
+
+        gl_FragColor -= vec4(vertexLambert, vertexLambert, vertexLambert, 0.0) * 0.4;
     }
     `;
     let mapThreeTexture = new THREE.TextureLoader().load( "asset/map_topology/test_map_1.png");
