@@ -181,6 +181,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     uniform vec2 flyOffset;
     uniform float flyAngle;
     uniform sampler2D mapData;
+    uniform vec2 worldScale;
 
     const float PI = 3.1415926535897932384626433832795;
     const float PI_2 = 1.57079632679489661923;
@@ -245,11 +246,11 @@ Gameplay.prototype.initializeThreeScene = function () {
     }
 
     void main() {
-        float heightVal = 128.0;
+        float heightVal = 256.0;
         waterHeight = 0.45;
 
         vec4 modelPos = vec4( position, 1.0 );
-        positionInWorld = flyOffset + rotate(modelPos.xy, flyAngle + PI_2);
+        positionInWorld = flyOffset + rotate(modelPos.xy * worldScale, flyAngle + PI_2);
         noiseVal = sampleMapDataAt(positionInWorld);
         float scaledNoise = max((noiseVal * heightVal), waterHeight * heightVal);
 
@@ -312,11 +313,11 @@ Gameplay.prototype.initializeThreeScene = function () {
     `;
     let mapThreeTexture = new THREE.TextureLoader().load( "asset/map_topology/test_map_1.png");
     let floorPlane = new THREE.PlaneBufferGeometry(1200, 1100, 500, 500);
-    let floorMat = new THREE.ShaderMaterial( { uniforms: { mapData: { value: mapThreeTexture }, flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
+    let floorMat = new THREE.ShaderMaterial( { uniforms: { mapData: { value: mapThreeTexture }, flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }, worldScale: { value: new THREE.Vector2(SHADER_WORLD_SCALE, SHADER_WORLD_SCALE) }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
     //floorMat.fog = true;
     let floor = new THREE.Mesh(floorPlane, floorMat);
     floor.rotation.x = Math.PI * -0.5;
-    floor.position.set(GAME_WIDTH * 0.5, -75, GAME_HEIGHT * 0.5 - 100);
+    floor.position.set(GAME_WIDTH * 0.5, -125, GAME_HEIGHT * 0.5 - 100);
     this.threeScene.add(floor);
     this.groundBackdrop = floor;
     this.groundMat = floorMat;
