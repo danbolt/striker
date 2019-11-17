@@ -224,7 +224,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     float sampleRandomWorldAt(vec2 pos) {
         float scale = 0.035;
 
-        return noise(pos * scale);
+        return noise(rotate(pos, PI_4) * scale);
     }
 
     void main() {
@@ -275,26 +275,29 @@ Gameplay.prototype.initializeThreeScene = function () {
     }
 
     void main() {
-        vec4 landColor = vec4(0.0, 0.7, 0.0, 1.0);
-        vec4 landColor2 = vec4(0.0, 0.4, 0.1, 1.0);
-        vec4 seaColor = vec4(0.0, 0.0, 0.5, 1.0);
-        vec4 seaColor2 = vec4(0.0, 0.6, 0.9, 1.0);
+        vec4 landColor = vec4(0.25, 0.23, 0.105, 1.0);
+        vec4 landColor2 = vec4(0.74, 0.7, 0.35, 1.0);
+        vec4 landColor3 = vec4(0.25, 0.507, 0.129, 1.0);
+        vec4 landColor4 = vec4(0.16, 0.321, 0.08, 1.0);
+        vec4 seaColor = vec4(0.23, 0.41, 0.45, 1.0);
+        vec4 seaColor2 = vec4(0.27 * 0.5, 0.68 * 0.5, 0.74 * 0.5, 1.0);
 
-        if (noiseVal > waterHeight) {
-            float val = noise(positionInWorld * 1.0);
+        float val = noise(positionInWorld * 1.0);
+        if ((noiseVal + (val * 0.05)) > (waterHeight + 0.1)) {
+            gl_FragColor = (val * landColor3) + ((1.0 - val) * landColor4);
+        } else if (noiseVal > waterHeight) {
             gl_FragColor = (val * landColor) + ((1.0 - val) * landColor2);
         } else {
-            float val = noise(positionInWorld * 0.1);
             gl_FragColor = (val * seaColor) + ((1.0 - val) * seaColor2);
         }
     }
     `;
-    let floorPlane = new THREE.PlaneBufferGeometry(2500, 2500, 300, 300);
+    let floorPlane = new THREE.PlaneBufferGeometry(1400, 1000, 300, 300);
     let floorMat = new THREE.ShaderMaterial( { uniforms: { flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
     //floorMat.fog = true;
     let floor = new THREE.Mesh(floorPlane, floorMat);
     floor.rotation.x = Math.PI * -0.5;
-    floor.position.set(GAME_WIDTH * 0.5, -100, GAME_HEIGHT * 0.5);
+    floor.position.set(GAME_WIDTH * 0.5, -100, GAME_HEIGHT * 0.5 - 100);
     this.threeScene.add(floor);
     this.groundBackdrop = floor;
     this.groundMat = floorMat;
