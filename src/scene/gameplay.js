@@ -71,6 +71,8 @@ Gameplay.prototype.preload = function () {
 
     this.load.binary('test_robot', 'asset/model/test_robot.glb');
     this.load.binary('basic_enemy', 'asset/model/basic_enemy.glb');
+
+    this.load.image('test_map_1', 'asset/map_topology/test_map_1.png');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -173,14 +175,12 @@ Gameplay.prototype.initializeThreeScene = function () {
         c.visible = false;
     }
 
-    // TODO: data this
-    this.sceneNoise = new SimplexNoise(Math);
-
     let sceneryVertShader = `
     precision mediump float;
 
     uniform vec2 flyOffset;
     uniform float flyAngle;
+    uniform sampler2D mapData;
 
     const float PI = 3.1415926535897932384626433832795;
     const float PI_2 = 1.57079632679489661923;
@@ -216,6 +216,17 @@ Gameplay.prototype.initializeThreeScene = function () {
         return res*res;
     }
 
+    vec3 rgb2hsv(vec3 c)
+    {
+        vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+        vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+        vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+
+        float d = q.x - min(q.w, q.y);
+        float e = 1.0e-10;
+        return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+    }
+
     varying float noiseVal;
     varying float waterHeight;
 
@@ -227,13 +238,19 @@ Gameplay.prototype.initializeThreeScene = function () {
         return noise(rotate(pos, PI_4) * scale);
     }
 
+    float sampleMapDataAt(vec2 pos) {
+        vec4 col = texture2D(mapData, pos / 1024.0);
+        vec3 colHsv = rgb2hsv(col.xyz);
+        return colHsv.z;
+    }
+
     void main() {
         float heightVal = 128.0;
         waterHeight = 0.45;
 
         vec4 modelPos = vec4( position, 1.0 );
         positionInWorld = flyOffset + rotate(modelPos.xy, flyAngle + PI_2);
-        noiseVal = sampleRandomWorldAt(positionInWorld);
+        noiseVal = sampleMapDataAt(positionInWorld);
         float scaledNoise = max((noiseVal * heightVal), waterHeight * heightVal);
 
         vec4 posCandidate =  projectionMatrix * modelViewMatrix * modelPos;
@@ -248,6 +265,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     varying float waterHeight;
 
     uniform vec2 flyOffset;
+    uniform sampler2D mapData;
 
     varying vec2 positionInWorld;
 
@@ -283,7 +301,7 @@ Gameplay.prototype.initializeThreeScene = function () {
         vec4 seaColor2 = vec4(0.27 * 0.5, 0.68 * 0.5, 0.74 * 0.5, 1.0);
 
         float val = noise(positionInWorld * 1.0);
-        if ((noiseVal + (val * 0.05)) > (waterHeight + 0.1)) {
+        if ((noiseVal) > (waterHeight + 0.1)) {
             gl_FragColor = (val * landColor3) + ((1.0 - val) * landColor4);
         } else if (noiseVal > waterHeight) {
             gl_FragColor = (val * landColor) + ((1.0 - val) * landColor2);
@@ -292,12 +310,13 @@ Gameplay.prototype.initializeThreeScene = function () {
         }
     }
     `;
-    let floorPlane = new THREE.PlaneBufferGeometry(1400, 1000, 300, 300);
-    let floorMat = new THREE.ShaderMaterial( { uniforms: { flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
+    let mapThreeTexture = new THREE.TextureLoader().load( "asset/map_topology/test_map_1.png");
+    let floorPlane = new THREE.PlaneBufferGeometry(1200, 1100, 500, 500);
+    let floorMat = new THREE.ShaderMaterial( { uniforms: { mapData: { value: mapThreeTexture }, flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
     //floorMat.fog = true;
     let floor = new THREE.Mesh(floorPlane, floorMat);
     floor.rotation.x = Math.PI * -0.5;
-    floor.position.set(GAME_WIDTH * 0.5, -100, GAME_HEIGHT * 0.5 - 100);
+    floor.position.set(GAME_WIDTH * 0.5, -75, GAME_HEIGHT * 0.5 - 100);
     this.threeScene.add(floor);
     this.groundBackdrop = floor;
     this.groundMat = floorMat;
