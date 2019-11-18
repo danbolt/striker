@@ -71,6 +71,7 @@ Gameplay.prototype.preload = function () {
 
     this.load.binary('test_robot', 'asset/model/test_robot.glb');
     this.load.binary('basic_enemy', 'asset/model/basic_enemy.glb');
+    this.load.binary('explosion', 'asset/model/explosion.glb');
 
     this.load.image('test_map_1', 'asset/map_topology/test_map_1.png');
 };
@@ -89,6 +90,8 @@ Gameplay.prototype.setupThreeBackground = function () {
     };
 };
 Gameplay.prototype.initializeThreeScene = function () {
+    this.decorMeshes = [];
+
     const loader = new THREE.GLTFLoader();
     let loadAndAppendModel = (root, modelName) => {
         const robotModelData = this.cache.binary.get(modelName);
@@ -174,6 +177,29 @@ Gameplay.prototype.initializeThreeScene = function () {
         this.threeScene.add(c);
         c.visible = false;
     }
+
+    this.explosionMeshPool = [];
+    for (var i = 0; i < EXPLOSION_POOL_SIZE; i++) {
+        let explosion = new THREE.Group();
+        explosion.flyAngle = 0;
+        loadAndAppendModel(explosion, 'explosion');
+        this.threeScene.add(explosion);
+        this.explosionMeshPool.push(explosion);
+        this.decorMeshes.push(explosion);
+    }
+    this.explosionIndex = 0;
+
+    this.vapourTrailPool = [];
+    let vapourGeom = new THREE.TetrahedronBufferGeometry(2.0, 1);
+    let vapourMats = [new THREE.MeshBasicMaterial({ color: 0xe6e4d1 }), new THREE.MeshBasicMaterial({ color: 0xbfbeb0 }),new THREE.MeshBasicMaterial({color: 0xccc9a5})];
+    for (var i = 0; i < 64; i++) {
+        let vaporMesh = new THREE.Mesh(vapourGeom, vapourMats[i % vapourMats.length]);
+        vaporMesh.flyAngle = 0;
+        this.vapourTrailPool.push(vaporMesh);
+        this.decorMeshes.push(vaporMesh);
+        this.threeScene.add(vaporMesh);
+    }
+    this.vaporIndex = 0;
 
     let sceneryVertShader = `
     precision mediump float;
@@ -359,7 +385,45 @@ Gameplay.prototype.updateThreeScene = function () {
 
     // This looks odd, but phaser's positive Y axis is in a different direction than three.js
     this.groundMat.uniforms.flyAngle.value = Math.atan2(Math.sin(this.cameraFlightPathAngle) * -1, Math.cos(this.cameraFlightPathAngle));
+
+    // make explosions/vapour/etc. look like they're moving
+    for (let i = 0; i < this.decorMeshes.length; i++) {
+        const sixtyFramesPerSecond = 0.016;
+
+        let mesh = this.decorMeshes[i];
+        const angle = (Phaser.Math.Angle.ShortestBetween(this.cameraFlightPathAngle * Phaser.Math.RAD_TO_DEG, mesh.flyAngle * Phaser.Math.RAD_TO_DEG) * Phaser.Math.DEG_TO_RAD) + (Math.PI * 0.5);
+        mesh.position.x += (Math.cos(angle)) * 300.0 * sixtyFramesPerSecond;
+        mesh.position.z += (Math.sin(angle)) * 300.0 * sixtyFramesPerSecond;
+    }
+
+    let nextVapor = this.vapourTrailPool[this.vaporIndex];
+    this.vaporIndex = (this.vaporIndex + 1) % this.vapourTrailPool.length;
+    nextVapor.rotation.set(Math.random(), Math.random(), Math.random());
+    const vapeScale = 2.0 * (Math.random() * 2.0);
+    nextVapor.scale.set(vapeScale, vapeScale, vapeScale);
+    nextVapor.position.set(this.player.x + ((Math.random() < 0.5) ? -8 : 8), 0, this.player.y + (5 - Math.random() * 5));
+    nextVapor.flyAngle = this.playerFlightPathDirection.angle();
 };
+Gameplay.prototype.triggerExplosion = function (x, y, z, scale, duration) {
+    scale = scale ? scale : 1.0;
+    duration = duration ? duration : 1.0;
+
+    let nextExplosion = this.explosionMeshPool[this.explosionIndex];
+    this.explosionIndex = (this.explosionIndex + 1) % this.explosionMeshPool.length;
+    nextExplosion.flyAngle = this.playerFlightPathDirection.angle();
+
+    if (nextExplosion.animData === undefined) {
+        return;
+    }
+
+    nextExplosion.rotation.set(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
+    nextExplosion.position.set(x, y, z);
+    nextExplosion.scale.set(scale, scale, scale);
+    const anim = nextExplosion.animData['explode'];
+    anim.setDuration(duration);
+    anim.reset();
+    anim.play();
+}
 Gameplay.prototype.setupEvents = function () {
 };
 Gameplay.prototype.removeEvents = function () {
@@ -377,7 +441,7 @@ Gameplay.prototype.updateFlightPath = function (newDir) {
         targets: this,
         duration: 4376,
         cameraFlightPathAngle: (currentAngle + minimumDistance),
-        ease: Phaser.Math.Easing.Elastic.Out,
+        ease: Phaser.Math.Easing.Cubic.Out,
         easeParams: [0.0001, 1.0]
     });
 };
@@ -508,6 +572,7 @@ Gameplay.prototype.initialzeBullets = function () {
 Gameplay.prototype.initializeCollisions = function () {
     this.physics.add.overlap(this.playerBullets, this.enemies, (bullet, enemy) => {
         const squad = this.squads[enemy.squadIndex];
+        this.triggerExplosion(enemy.x, 0, enemy.y, 0.73535, 0.45);
         if (squad === null) {
             this.enemies.killAndHide(enemy);
             this.enemyMeshPool[enemy.type].push(enemy.mesh);
@@ -520,6 +585,7 @@ Gameplay.prototype.initializeCollisions = function () {
         squad.health_data[enemy.shipIndex] -= BULLET_DAMAGE;
 
         if (squad.health_data[enemy.shipIndex] <= 0) {
+
             squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
             this.enemyMeshPool[enemy.type].push(enemy.mesh);
@@ -536,7 +602,10 @@ Gameplay.prototype.initializeCollisions = function () {
 
     this.physics.add.overlap(this.playerSword, this.enemies, (sword, enemy) => {
         const squad = this.squads[enemy.squadIndex];
+        this.triggerExplosion(enemy.x, 0, enemy.y, 0.73535, 0.45);
+
         if (squad === null) {
+            this.triggerExplosion(enemy.x, 0, enemy.y, 0.487535, 0.45);
             this.enemies.killAndHide(enemy);
             this.enemyMeshPool[enemy.type].push(enemy.mesh);
             enemy.mesh.visible = false;
@@ -579,6 +648,8 @@ Gameplay.prototype.initializeCollisions = function () {
             return;
         }
 
+
+        this.triggerExplosion(enemy.x, 0, enemy.y, 0.487535, 0.45);
         squad.health_data[enemy.shipIndex] = 0;
         squad.onscreen_ships--;
         this.enemies.killAndHide(enemy);
@@ -824,26 +895,6 @@ Gameplay.prototype.update = function () {
             }
         }
 
-        // Twin-stick style aiming
-        /*
-        if (this.keys.rightAimArrow.isDown) {
-            this.playerAimDir.x = 1;
-        } else if (this.keys.leftAimArrow.isDown) {
-            this.playerAimDir.x = -1;
-        } 
-        if (this.keys.downAimArrow.isDown) {
-            this.playerAimDir.y = 1;
-        } else if (this.keys.upAimArrow.isDown) {
-            this.playerAimDir.y = -1;
-        }
-        if (this.input.gamepad && (this.input.gamepad.total > 0)) {
-            var pad = this.input.gamepad.getPad(0);
-            if (pad.rightStick.lengthSq() > 0.1) {
-              this.playerAimDir.x = pad.rightStick.x;
-              this.playerAimDir.y = pad.rightStick.y;
-            }
-        }
-        */
         this.playerAimDir.normalize();
 
         // shooting
