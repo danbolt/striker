@@ -391,9 +391,8 @@ Gameplay.prototype.updateThreeScene = function () {
         const sixtyFramesPerSecond = 0.016;
 
         let mesh = this.decorMeshes[i];
-        const angle = (Phaser.Math.Angle.ShortestBetween(this.cameraFlightPathAngle * Phaser.Math.RAD_TO_DEG, mesh.flyAngle * Phaser.Math.RAD_TO_DEG) * Phaser.Math.DEG_TO_RAD) + (Math.PI * 0.5);
-        mesh.position.x += (Math.cos(angle)) * 300.0 * sixtyFramesPerSecond;
-        mesh.position.z += (Math.sin(angle)) * 300.0 * sixtyFramesPerSecond;
+        mesh.position.x -= (Math.cos(mesh.flyAngle - this.cameraFlightPathAngle + (Math.PI * 0.5))) * 300.0 * sixtyFramesPerSecond;
+        mesh.position.z += (Math.sin(mesh.flyAngle - this.cameraFlightPathAngle + (Math.PI * 0.5))) * 300.0 * sixtyFramesPerSecond;
     }
 
     let nextVapor = this.vapourTrailPool[this.vaporIndex];
@@ -429,20 +428,29 @@ Gameplay.prototype.setupEvents = function () {
 Gameplay.prototype.removeEvents = function () {
 };
 Gameplay.prototype.updateFlightPath = function (newDir) {
+    if (this.isTurning === true) {
+        return;
+    }
+
     this.playerFlightPathDirection.x = newDir.x;
     this.playerFlightPathDirection.y = newDir.y;
     this.playerFlightPathDirection.normalize();
 
+    this.isTurning = true;
 
     const currentAngle = this.cameraFlightPathAngle;
     const targetAngle = this.playerFlightPathDirection.angle();
     const minimumDistance = ((targetAngle - currentAngle) + Math.PI) % (Math.PI * 2) - Math.PI;
+    console.log(minimumDistance);
     let t = this.add.tween({
         targets: this,
-        duration: 4376,
+        duration: 2000,
         cameraFlightPathAngle: (currentAngle + minimumDistance),
         ease: Phaser.Math.Easing.Cubic.Out,
-        easeParams: [0.0001, 1.0]
+        easeParams: [0.0001, 1.0],
+        onComplete: () => {
+            this.isTurning = false;
+        }
     });
 };
 Gameplay.prototype.getFlightPath = function() {
