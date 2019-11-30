@@ -55,7 +55,7 @@ Gameplay.prototype.init = function () {
     this.keys.upAimArrow = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
     this.keys.aKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.keys.bKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-    this.keys.cKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.V);
+    this.keys.cKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     this.keys.rKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.keys.lKey = this.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
@@ -138,7 +138,7 @@ Gameplay.prototype.initializeThreeScene = function () {
 
     let basicSwordGeom = new THREE.BoxBufferGeometry(8, 64, 8);
     let basicSwordMat = new THREE.MeshBasicMaterial( { color: 0xFFFFFF , wireframe: true} );
-    let swordColors = [0xFF0000, 0xFFFF00, 0x00FFFF, 0xaaccFF].map((col) => { return new THREE.Color(col); });
+    let swordColors = [0x0000FF, 0xFFFFFF, 0x0000FF, 0xFFFFFF].map((col) => { return new THREE.Color(col); });
     let swordColorsIndex = 0;
     this.time.addEvent({ delay: 16, callback: () => {
         swordColorsIndex = (swordColorsIndex + 1) % swordColors.length;
@@ -146,6 +146,37 @@ Gameplay.prototype.initializeThreeScene = function () {
     }, callbackScope: this, loop: true });
     let basicSwordMesh = new THREE.Mesh(basicSwordGeom, basicSwordMat);
     this.sceneMeshData['sword'] = basicSwordMesh;
+
+    let c = new THREE.Color(0x1111CC);
+    let cTo = new THREE.Color(0xFFFFFF);
+    let trails = [];
+    const trailPieces = 10;
+    for (var i = 0; i < trailPieces; i++) {
+        let trailMesh = new THREE.Mesh(basicSwordGeom, new THREE.MeshBasicMaterial( { color: c.getHex() } ));
+        c.lerp(cTo, 0.35);
+        this.threeScene.add(trailMesh);
+        trails.push(trailMesh);
+    }
+    this.time.addEvent({delay: 16, loop: true, callback: () => {
+        for (let i = (trails.length - 1); i >= 0; i--) {
+            let piece = trails[i];
+            if (i === 0) {
+                basicSwordMesh.getWorldPosition(piece.position);
+                basicSwordMesh.getWorldQuaternion(piece.quaternion);
+                piece.visible = basicSwordMesh.visible;
+                continue;
+            }
+            let prevPiece = trails[i - 1];
+            piece.position.x = prevPiece.position.x;
+            piece.position.y = prevPiece.position.y;
+            piece.position.z = prevPiece.position.z;
+            piece.rotation.x = prevPiece.rotation.x;
+            piece.rotation.y = prevPiece.rotation.y;
+            piece.rotation.z = prevPiece.rotation.z;
+            piece.visible = prevPiece.visible;
+            piece.scale.set(1 - (i / trailPieces), 1 - (i / trailPieces), 1 - (i / trailPieces));
+        }
+    }});
     
     this.enemyMeshPool['basic'] = [];
     for (var i = 1; i < ENEMY_POOL_SIZE; i++) {
@@ -441,7 +472,6 @@ Gameplay.prototype.updateFlightPath = function (newDir) {
     const currentAngle = this.cameraFlightPathAngle;
     const targetAngle = this.playerFlightPathDirection.angle();
     const minimumDistance = ((targetAngle - currentAngle) + Math.PI) % (Math.PI * 2) - Math.PI;
-    console.log(minimumDistance);
     let t = this.add.tween({
         targets: this,
         duration: 2000,
@@ -472,14 +502,17 @@ Gameplay.prototype.initializePlayer = function () {
     this.player.canStrike = true;
     this.time.addEvent({ delay: PLAYER_SHOT_DELAY_MS, callback: () => { this.canShoot = true; }, callbackScope: this, loop: true });
 
-    this.playerSword = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
-    this.playerSword.setVisible(false);
-    this.physics.add.existing(this.playerSword);
-    this.playerSword.body.setSize(8, 96, true);
-    this.playerSword.rotation = 0.45;
-    this.playerSword.x = -19999;
-    this.playerSword.y = -999999;
-    this.playerSword.moves = true;
+    this.swordHits = [];
+    for (var i = 0; i < PLAYER_SWORD_SEGMENTS; i++) {
+        let newSwordPiece = this.add.sprite(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.5, 'test_sheet', 0);
+        newSwordPiece.setVisible(false);
+        this.physics.add.existing(newSwordPiece);
+        newSwordPiece.body.setSize(8, PLAYER_SWORD_LENGTH / PLAYER_SWORD_SEGMENTS, true);
+        newSwordPiece.x = -19999;
+        newSwordPiece.y = -999999;
+        newSwordPiece.moves = true;
+        this.swordHits.push(newSwordPiece);
+    }
 };
 Gameplay.prototype.initializeEnemies = function() {
     this.enemies = this.add.group();
@@ -608,7 +641,7 @@ Gameplay.prototype.initializeCollisions = function () {
         bullet.y = -9999;
     }, (bullet, enemy) => { return enemy.active; });
 
-    this.physics.add.overlap(this.playerSword, this.enemies, (sword, enemy) => {
+    this.physics.add.overlap(this.swordHits, this.enemies, (sword, enemy) => {
         const squad = this.squads[enemy.squadIndex];
         this.triggerExplosion(enemy.x, 0, enemy.y, 0.73535, 0.45);
 
@@ -635,8 +668,13 @@ Gameplay.prototype.initializeCollisions = function () {
         }
     }, (sword, enemy) => { return enemy.active; });
 
-    this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
+    this.physics.add.overlap(this.swordHits, this.enemyBullets, (sword, enemyBullet) => {
+            this.enemyBullets.killAndHide(enemyBullet);
+            enemyBullet.x = -99999;
+            enemyBullet.y = -99999;
+    }, (sword, enemyBullet) => { return enemyBullet.active; });
 
+    this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
         this.enemyBullets.killAndHide(enemyBullet);
         enemyBullet.x = -99999;
         enemyBullet.y = -99999;
@@ -970,13 +1008,36 @@ Gameplay.prototype.update = function () {
                 }
                 this.sceneMeshData['player'].swordBone.add(sword);
 
-                this.playerSword.x = this.player.x - 32;
-                this.playerSword.y = this.player.y - 32;
+                for (var i = 0; i < this.swordHits.length; i++) {
+                    let piece = this.swordHits[i];
+                    piece.x = this.player.x - Math.cos(sword.rotation.y) * (PLAYER_SWORD_LENGTH / PLAYER_SWORD_SEGMENTS * i);
+                    piece.y = this.player.y - Math.sin(sword.rotation.y) * (PLAYER_SWORD_LENGTH / PLAYER_SWORD_SEGMENTS * i);
+                }
                 let comp = () => {
-                    this.playerSword.x = -19999;
-                    this.playerSword.y = -19999;
+                    for (var i = 0; i < this.swordHits.length; i++) {
+                        let piece = this.swordHits[i];
+                        piece.x = -19999;
+                        piece.y = -19999;
+                    }
                 };
-                let t = this.add.tween({ targets: this.playerSword, duration: (PLAYER_STRIKE_TIME * 1000), x: this.player.x + 32, y: this.player.y - 32 , onComplete: comp});
+                let ind = 0;
+                this.time.addEvent({
+                    repeat: 10,
+                    delay: (PLAYER_STRIKE_TIME * 1000 / 10),
+                    callback: () => {
+                        ind++;
+                        for (var i = 0; i < this.swordHits.length; i++) {
+                            let piece = this.swordHits[i];
+                            piece.x = this.player.x - Math.cos(ind / 10 * Math.PI) * (PLAYER_SWORD_LENGTH / PLAYER_SWORD_SEGMENTS * i);
+                            piece.y = this.player.y - Math.sin(ind / 10 * Math.PI) * (PLAYER_SWORD_LENGTH / PLAYER_SWORD_SEGMENTS * i);
+                        }
+
+                        if (ind > 10) {
+                            comp();
+                        }
+                    }
+                });
+
             };
             if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).Y || this.input.gamepad.getPad(0).L2)) {
                 strike();
@@ -1100,6 +1161,7 @@ Gameplay.prototype.update = function () {
 };
 Gameplay.prototype.shutdown = function () {
     this.player = null;
+    this.swordHits = [];
     this.playerBullets.clear(true, true);
     this.enemyBullets.clear(true, true);
 
