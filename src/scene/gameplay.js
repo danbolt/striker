@@ -1,6 +1,3 @@
-
-
-
 let Gameplay = function (config) {
     Phaser.Scene.call(this, config);
 
@@ -207,6 +204,85 @@ Gameplay.prototype.initializeThreeScene = function () {
         this.bulletMeshPool['enemy'].push(c);
         this.threeScene.add(c);
         c.visible = false;
+    }
+
+    this.reflectMeshPool = [];
+    this.reflectMeshIndex = 0;
+    const reflectGeom = new THREE.BoxBufferGeometry(16, 16, 16);
+    const reflectMaterial = new THREE.ShaderMaterial({ alphaTest: 0.1, vertexShader: `
+        precision mediump float;
+
+        varying float colourRandValue;
+
+        float rand(float n){return fract(sin(n) * 43758.5453123);}
+
+        float noise(float p){
+            float fl = floor(p);
+            float fc = fract(p);
+            return mix(rand(fl), rand(fl + 1.0), fc);
+        }
+
+        float rand(vec2 n) { 
+            return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+        }
+
+        float noise(vec2 p){
+            vec2 ip = floor(p);
+            vec2 u = fract(p);
+            u = u*u*(3.0-2.0*u);
+
+            float res = mix(
+            mix(rand(ip),rand(ip+vec2(1.0,0.0)),u.x),
+            mix(rand(ip+vec2(0.0,1.0)),rand(ip+vec2(1.0,1.0)),u.x),u.y);
+            return res*res;
+        }
+
+        void main() {
+            gl_Position = (projectionMatrix * modelViewMatrix * vec4( position, 1.0 ));
+
+            gl_Position += vec4(rand(gl_Position.xz), -rand(gl_Position.xz), rand(gl_Position.xz), 0.0);
+
+            colourRandValue = rand(gl_Position.xz);
+        }
+
+        `,
+        fragmentShader: `
+        precision mediump float;
+
+        varying float colourRandValue;
+
+        float rand(float n){return fract(sin(n) * 17858.5453123);}
+
+        float noise(float p){
+        float fl = floor(p);
+            float fc = fract(p);
+            return mix(rand(fl), rand(fl + 1.0), fc);
+        }
+
+        float rand(vec2 n) { 
+            return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
+        }
+
+        float noise(vec2 p){
+            vec2 ip = floor(p);
+            vec2 u = fract(p);
+            u = u*u*(3.0-2.0*u);
+
+            float res = mix(
+            mix(rand(ip),rand(ip+vec2(1.0,0.0)),u.x),
+            mix(rand(ip+vec2(0.0,1.0)),rand(ip+vec2(1.0,1.0)),u.x),u.y);
+            return res*res;
+        }
+
+        void main() {
+            gl_FragColor = vec4(sin(colourRandValue * 3.14) * 0.5 + 0.5, sin(2.0 + (colourRandValue * 3.14)) * 0.5 + 0.5,  sin(4.0 + (colourRandValue * 3.14)) * 0.5 + 0.5, 1.0);
+        }
+        `})
+    for (var i = 0; i < 10; i++) {
+        let reflectMesh = new THREE.Mesh(reflectGeom, reflectMaterial);
+        reflectMesh.visible = false;
+        this.threeScene.add(reflectMesh);
+        this.reflectMeshPool.push(reflectMesh);
     }
 
     this.explosionMeshPool = [];
@@ -626,7 +702,6 @@ Gameplay.prototype.initializeCollisions = function () {
         squad.health_data[enemy.shipIndex] -= BULLET_DAMAGE;
 
         if (squad.health_data[enemy.shipIndex] <= 0) {
-
             squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
             this.enemyMeshPool[enemy.type].push(enemy.mesh);
@@ -672,6 +747,60 @@ Gameplay.prototype.initializeCollisions = function () {
             this.enemyBullets.killAndHide(enemyBullet);
             enemyBullet.x = -99999;
             enemyBullet.y = -99999;
+
+            if (!(enemyBullet.owner)) {
+                return;
+            }
+
+            const enemy = enemyBullet.owner;
+            if (!(enemy.mesh)) {
+                return;
+            }
+
+            let nextMesh = this.reflectMeshPool[this.reflectMeshIndex];
+            nextMesh.visible = true;
+            nextMesh.position.set(sword.x, 0, sword.y);
+            this.reflectMeshIndex = (this.reflectMeshIndex + 1) % this.reflectMeshPool.length;
+
+            this.add.tween({
+                ease: Phaser.Math.Easing.Sine.In,
+                targets: nextMesh.position,
+                duration: 432,
+                x: enemyBullet.owner.x,
+                y: [4, -4, 4, 0],
+                z: enemyBullet.owner.y,
+                onComplete: () => {
+                    nextMesh.visible = false;
+
+                    
+                    const squad = this.squads[enemy.squadIndex];
+                    this.triggerExplosion(enemy.x, 0, enemy.y, 0.73535, 0.45);
+                    if (squad === null) {
+                        this.enemies.killAndHide(enemy);
+                        if (enemy.mesh) {
+                            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+                            enemy.mesh.visible = false;
+                            enemy.mesh = null;
+                        }
+                        enemy.x = -99999;
+                        enemy.y = -99999;
+                        return;
+                    }
+                    squad.health_data[enemy.shipIndex] -= REFLECT_DAMAGE;
+
+                    if (squad.health_data[enemy.shipIndex] <= 0) {
+                        squad.onscreen_ships--;
+                        this.enemies.killAndHide(enemy);
+                        if (enemy.mesh) {
+                            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+                            enemy.mesh.visible = false;
+                            enemy.mesh = null;
+                        }
+                        enemy.x = -99999;
+                        enemy.y = -99999;
+                    }
+                }
+            });
     }, (sword, enemyBullet) => { return enemyBullet.active; });
 
     this.physics.add.overlap(this.player, this.enemyBullets, (player, enemyBullet) => {
@@ -1091,6 +1220,7 @@ Gameplay.prototype.update = function () {
         newBullet.setActive(true);
         newBullet.body.velocity.x = Math.cos(angle) * velocity;
         newBullet.body.velocity.y = Math.sin(angle) * velocity;
+        newBullet.owner = enemy;
     };
     let enemyIter = (enemy) => {
         if (enemy.active === false) {
