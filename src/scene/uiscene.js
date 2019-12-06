@@ -12,6 +12,8 @@ InGameUI.prototype.preload = function () {
     this.load.bitmapFont('newsgeek', 'asset/font/newsgeek.png', 'asset/font/newsgeek.fnt');
     this.load.bitmapFont('century', 'asset/font/century_0.png', 'asset/font/century.fnt');
 
+    this.load.image('test_map_1', 'asset/map_topology/test_map_1.png');
+
     this.load.glsl('scanlines', 'asset/shader/scanlines.frag');
 };
 const filled = ['▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒', '▓', '▒'];
@@ -32,6 +34,10 @@ InGameUI.prototype.refreshUI = function(playerHealth) {
   this.debugHealthText.text =  'BARRIER\n  ' + this.returnPlayerHealth(playerHealth, PLAYER_MAX_HEALTH);
 };
 InGameUI.prototype.refreshMap = function(worldSize, playerPosition, squads) {
+  if (this.mapSprite === undefined) {
+    return;
+  }
+  
   worldSize = (worldSize === undefined) ? new Phaser.Math.Vector2(1000, 1000) : worldSize;
 
   this.mapSprite.clear();
@@ -166,9 +172,9 @@ InGameUI.prototype.update = function () {
     this.aimDirection.y = 0;
   }
   if (pad !== null) {
-    if (pad.rightStick.lengthSq() > 0.1) {
-      this.aimDirection.x = pad.rightStick.x;
-      this.aimDirection.y = pad.rightStick.y;
+    if (pad.leftStick.lengthSq() > 0.1) {
+      this.aimDirection.x = pad.leftStick.x;
+      this.aimDirection.y = pad.leftStick.y;
     }
   }
   this.aimDirection.normalize();

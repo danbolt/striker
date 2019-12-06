@@ -69,8 +69,6 @@ Gameplay.prototype.preload = function () {
     this.load.binary('test_robot', 'asset/model/test_robot.glb');
     this.load.binary('basic_enemy', 'asset/model/basic_enemy.glb');
     this.load.binary('explosion', 'asset/model/explosion.glb');
-
-    this.load.image('test_map_1', 'asset/map_topology/test_map_1.png');
 };
 Gameplay.prototype.setupThreeBackground = function () {
     this.three = this.add.extern(); 
@@ -466,7 +464,7 @@ Gameplay.prototype.initializeThreeScene = function () {
     }
     `;
     let mapThreeTexture = new THREE.TextureLoader().load( "asset/map_topology/test_map_1.png");
-    let floorPlane = new THREE.PlaneBufferGeometry(1200, 1100, 500, 500);
+    let floorPlane = new THREE.PlaneBufferGeometry(1400, 1100, 500, 500);
     let floorMat = new THREE.ShaderMaterial( { uniforms: { mapData: { value: mapThreeTexture }, flyAngle: { value: 0 }, flyOffset: { value: new THREE.Vector2() }, worldScale: { value: new THREE.Vector2(SHADER_WORLD_SCALE, SHADER_WORLD_SCALE) }}, vertexShader: sceneryVertShader, fragmentShader: sceneryFragShader } );
     //floorMat.fog = true;
     let floor = new THREE.Mesh(floorPlane, floorMat);
@@ -477,9 +475,12 @@ Gameplay.prototype.initializeThreeScene = function () {
     this.groundMat = floorMat;
 };
 
+const playerRotationAxis = new THREE.Vector3(0, 0, -1.0);
 Gameplay.prototype.updateThreeScene = function () {
-    this.sceneMeshData['player'].position.set(this.player.x, 0, this.player.y);
-    this.sceneMeshData['player'].rotation.set(0, Math.PI, 0);
+    const playerMesh = this.sceneMeshData['player']
+    playerMesh.position.set(this.player.x, 0, this.player.y);
+    playerMesh.lookAt(this.player.x, 0, this.player.y - 1.0);
+    playerMesh.rotateOnWorldAxis(playerRotationAxis, (this.player.body.velocity.x / PLAYER_FLIGHT_SPEED) * 0.015);
 
     const cameraYDist = 300;
     const cameraZDist = 200;
@@ -765,9 +766,9 @@ Gameplay.prototype.initializeCollisions = function () {
             this.add.tween({
                 ease: Phaser.Math.Easing.Sine.In,
                 targets: nextMesh.position,
-                duration: 432,
+                duration: 230,
                 x: enemyBullet.owner.x,
-                y: [4, -4, 4, 0],
+                y: [32, -4, 10, 0],
                 z: enemyBullet.owner.y,
                 onComplete: () => {
                     nextMesh.visible = false;
@@ -828,11 +829,13 @@ Gameplay.prototype.initializeCollisions = function () {
         squad.health_data[enemy.shipIndex] = 0;
         squad.onscreen_ships--;
         this.enemies.killAndHide(enemy);
-        this.enemyMeshPool[enemy.type].push(enemy.mesh);
-        enemy.mesh.visible = false;
-        enemy.mesh = null;
-        enemy.x = -99999;
-        enemy.y = -99999;
+        if (enemy.mesh) {
+            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            enemy.mesh.visible = false;
+            enemy.mesh = null;
+            enemy.x = -99999;
+            enemy.y = -99999;
+        }
 
         this.playerHealth -= ENEMY_COLLIDE_DAMAGE;
         if (this.playerHealth <= 0) {
@@ -847,6 +850,9 @@ Gameplay.prototype.initializeCollisions = function () {
 Gameplay.prototype.create = function () {
     this.uiScene = this.scene.get('InGameUI');
     this.setupEvents();
+    this.time.delayedCall(100, () => {
+        this.uiScene.refreshUI(PLAYER_MAX_HEALTH);
+    });
 
     this.setupThreeBackground();
     this.initializeThreeScene();
@@ -1078,7 +1084,7 @@ Gameplay.prototype.update = function () {
                 spawnBullet();
                 this.canShoot = false;
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).B || this.input.gamepad.getPad(0).R1)) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).B/* || this.input.gamepad.getPad(0).R1*/)) {
                 shoot();
             } else if (this.keys.aKey.isDown) {
                 shoot();
@@ -1087,6 +1093,7 @@ Gameplay.prototype.update = function () {
 
         if ((this.player.dodging === false) && (this.player.canDodge === true) && (this.player.striking === false)) {
             let dodge = () => {
+                console.log('dodge');
                 this.player.dodging = true;
                 this.player.canDodge = false;
 
@@ -1097,7 +1104,7 @@ Gameplay.prototype.update = function () {
                     this.player.canDodge = true;
                 });
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).A || this.input.gamepad.getPad(0).L1)) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).A/* || this.input.gamepad.getPad(0).L1*/)) {
                 dodge();
             } else if (this.keys.bKey.isDown) {
                 dodge();
@@ -1112,9 +1119,11 @@ Gameplay.prototype.update = function () {
 
                 this.time.delayedCall(PLAYER_DODGE_TIME_MS, () => {
                     this.player.striking = false;
+                    this.player.canDodge = true;
                 });
                 this.time.delayedCall(PLAYER_DODGE_RECHARGE_TIME_MS, () => {
                     this.player.canStrike = true;
+                    this.player.canDodge = true;
                 });
 
                 let sword = this.sceneMeshData['sword'];
@@ -1168,7 +1177,7 @@ Gameplay.prototype.update = function () {
                 });
 
             };
-            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).Y || this.input.gamepad.getPad(0).L2)) {
+            if (this.input.gamepad && (this.input.gamepad.total > 0) && (this.input.gamepad.getPad(0).Y /*|| this.input.gamepad.getPad(0).L2*/)) {
                 strike();
             } else if (this.keys.cKey.isDown) {
                 strike();
@@ -1283,7 +1292,7 @@ Gameplay.prototype.update = function () {
         const sixtyFramesPerSecond = 0.016;
         mixer.update(sixtyFramesPerSecond);
     })
-    this.uiScene.refreshUI(this.playerHealth, this.score);
+    //this.uiScene.refreshUI(this.playerHealth, this.score);
 
 
     this.updateWorld();
