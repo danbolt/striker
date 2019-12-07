@@ -1,0 +1,38 @@
+{
+	"basic": {
+		"max_health": 22,
+		"move_speed": 180,
+		"collision_damage": 2,
+		"pattern": "classic",
+		"mesh": "basic"
+	},
+	"spray_basic_right": {
+		"max_health": 22,
+		"move_speed": 180,
+		"collision_damage": 2,
+		"pattern": "spray_right",
+		"mesh": "basic"
+	},
+	"spray_basic_left": {
+		"max_health": 22,
+		"move_speed": 180,
+		"collision_damage": 2,
+		"pattern": "spray_left",
+		"mesh": "basic"
+	},
+	"big_slow": {
+		"max_health": 40,
+		"move_speed": 90,
+		"collision_damage": 5,
+		"pattern": "classic",
+		"mesh": "basic"
+
+	},
+	"little_weak": {
+		"max_health": 5,
+		"move_speed": 240,
+		"collision_damage": 2,
+		"pattern": "classic",
+		"mesh": "basic"
+	}
+}

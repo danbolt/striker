@@ -65,6 +65,8 @@ Gameplay.prototype.preload = function () {
     this.load.glsl('film_grain', 'asset/shader/film_grain.frag');
 
     this.load.json('formations', 'asset/formation/formations.json');
+    this.load.json('ship_data', 'asset/formation/ships/ship_data.json');
+    this.load.json('bullet_patterns', 'asset/formation/ships/bullet_patterns.json');
 
     this.load.binary('test_robot', 'asset/model/test_robot.glb');
     this.load.binary('basic_enemy', 'asset/model/basic_enemy.glb');
@@ -600,7 +602,8 @@ Gameplay.prototype.initializeEnemies = function() {
         enemy.tint = 0xFF6666;
         enemy.visible = false;
         enemy.name = BULLET_NAME_KEY;
-        enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
+        enemy.timeToTextBullet = 0;
+        enemy.bulletIndex = 0;
         enemy.path = null;
         enemy.startOffset = new Phaser.Math.Vector2(0, 0);
         enemy.pathPos = 0;
@@ -631,7 +634,16 @@ Gameplay.prototype.deployFormation = function(formationKey, deployDelay, squadIn
 
         this.time.addEvent({ delay: (deployDelay + (i * formation.deploy_rate)), callback: () => {
             const shipType = formation.ships[i];
-            // TODO: Depends on ship type
+            const shipInfo = this.shipData[shipType];
+            if (shipInfo === undefined) {
+                console.warn('Ship info ' + shipType + ' was not found!');
+                return;
+            }
+            const pattern = this.bulletPatterns[shipInfo.pattern];
+            if (pattern === undefined) {
+                console.warn('Ship info ' + shipInfo.pattern + ' was not found!');
+                return;
+            }
 
             let newEnemy = this.enemies.getFirstDead();
             if (newEnemy === null) {
@@ -648,10 +660,12 @@ Gameplay.prototype.deployFormation = function(formationKey, deployDelay, squadIn
             newEnemy.startOffset.y = formation.offset_per_deploy.y * i;
             newEnemy.entering = true;
             newEnemy.shipIndex = i;
+            newEnemy.shipInfo = shipInfo;
+            newEnemy.pattern = pattern;
             newEnemy.squadIndex = squadIndex;
             newEnemy.type = shipType;
-            if (this.enemyMeshPool[shipType].length > 0) {
-                newEnemy.mesh = this.enemyMeshPool[shipType].pop();
+            if (this.enemyMeshPool[newEnemy.shipInfo.mesh].length > 0) {
+                newEnemy.mesh = this.enemyMeshPool[newEnemy.shipInfo.mesh].pop();
                 newEnemy.mesh.visible = true;
             }
             squad.onscreen_ships++;
@@ -693,7 +707,7 @@ Gameplay.prototype.initializeCollisions = function () {
         this.triggerExplosion(enemy.x, 0, enemy.y, 0.73535, 0.45);
         if (squad === null) {
             this.enemies.killAndHide(enemy);
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             enemy.x = -99999;
@@ -705,7 +719,7 @@ Gameplay.prototype.initializeCollisions = function () {
         if (squad.health_data[enemy.shipIndex] <= 0) {
             squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             enemy.x = -99999;
@@ -724,7 +738,7 @@ Gameplay.prototype.initializeCollisions = function () {
         if (squad === null) {
             this.triggerExplosion(enemy.x, 0, enemy.y, 0.487535, 0.45);
             this.enemies.killAndHide(enemy);
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             enemy.x = -99999;
@@ -736,7 +750,7 @@ Gameplay.prototype.initializeCollisions = function () {
         if (squad.health_data[enemy.shipIndex] <= 0) {
             squad.onscreen_ships--;
             this.enemies.killAndHide(enemy);
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             enemy.x = -99999;
@@ -779,7 +793,7 @@ Gameplay.prototype.initializeCollisions = function () {
                     if (squad === null) {
                         this.enemies.killAndHide(enemy);
                         if (enemy.mesh) {
-                            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+                            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
                             enemy.mesh.visible = false;
                             enemy.mesh = null;
                         }
@@ -793,7 +807,7 @@ Gameplay.prototype.initializeCollisions = function () {
                         squad.onscreen_ships--;
                         this.enemies.killAndHide(enemy);
                         if (enemy.mesh) {
-                            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+                            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
                             enemy.mesh.visible = false;
                             enemy.mesh = null;
                         }
@@ -830,7 +844,7 @@ Gameplay.prototype.initializeCollisions = function () {
         squad.onscreen_ships--;
         this.enemies.killAndHide(enemy);
         if (enemy.mesh) {
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             enemy.x = -99999;
@@ -880,6 +894,9 @@ Gameplay.prototype.create = function () {
         this.formationData[formationKey] = formation;
     } 
 
+    this.shipData = this.cache.json.get('ship_data');
+    this.bulletPatterns = this.cache.json.get('bullet_patterns');
+
 
     /*
     // TODO: editor data should look like this
@@ -917,7 +934,8 @@ Gameplay.prototype.create = function () {
         const extraR = Math.random() * 400;
         const dir = Math.random() * Math.PI * 2;
         this.squads.push({
-            formation: ['sample_a', 'sample_b', 'sample_c', 'sample_d'][~~(Math.random() * 4)],
+            formation: 'spray_squad_right',
+            //formation: ['sample_a', 'sample_b', 'sample_c', 'sample_d'][~~(Math.random() * 4)],
             in_battle: false,
             x: (this.worldSize.x * 0.5) + Math.cos(dir) * (minR + extraR),
             y: (this.worldSize.y * 0.5) + Math.sin(dir) * (minR + extraR)
@@ -946,6 +964,7 @@ Gameplay.prototype.initializeSquadData = function(squad) {
         squad.health_data.push(shipHealth);
     });
     squad.onscreen_ships = 0;
+    squad.in_battle = false;
 }
 
 let pathPointCache = new Phaser.Math.Vector2(0, 0);
@@ -1093,7 +1112,6 @@ Gameplay.prototype.update = function () {
 
         if ((this.player.dodging === false) && (this.player.canDodge === true) && (this.player.striking === false)) {
             let dodge = () => {
-                console.log('dodge');
                 this.player.dodging = true;
                 this.player.canDodge = false;
 
@@ -1236,16 +1254,27 @@ Gameplay.prototype.update = function () {
             return;
         }
 
-        enemy.timeToTextBullet -= 16; // <-- TODO: need real delta
+        enemy.timeToTextBullet -= 0.016; // <-- TODO: need real delta
         if (enemy.timeToTextBullet <= 0) {
-            enemy.timeToTextBullet = ENEMY_BULLET_PERIOD_MS;
-            spawnEnemyBullet(enemy, Math.PI * 0.5, ENEMY_BULLET_SPEED);
+            spawnEnemyBullet(enemy, enemy.pattern.shots[enemy.bulletIndex].angle * Phaser.Math.DEG_TO_RAD, enemy.pattern.shots[enemy.bulletIndex].speed ? enemy.pattern.shots[enemy.bulletIndex].speed : ENEMY_BULLET_SPEED);
+
+            enemy.bulletIndex = enemy.bulletIndex + 1;
+            if (enemy.bulletIndex >= enemy.pattern.shots.length) {
+                if (enemy.pattern.repeat) {
+                    enemy.bulletIndex = 0;
+                    enemy.timeToTextBullet = enemy.pattern.shots[0].wait;
+                } else {
+                    enemy.timeToTextBullet = 999999999999;
+                }
+            } else {
+                enemy.timeToTextBullet = enemy.pattern.shots[enemy.bulletIndex].wait;
+            }
         }
 
         // TODO: de-hack path timing per tick
         const sixtyFramesPerSecond = 0.016;
         const length = enemy.path.getLength();
-        const pathVeloRatio = ENEMY_MOVE_SPEED / length * sixtyFramesPerSecond;
+        const pathVeloRatio = enemy.shipInfo.move_speed / length * sixtyFramesPerSecond;
         enemy.pathPos += pathVeloRatio;
         enemy.pathPos = Math.min(1, enemy.pathPos);
         enemy.path.getPoint(enemy.pathPos, pathPointCache);
@@ -1275,7 +1304,7 @@ Gameplay.prototype.update = function () {
             }
             enemy.x = -999999;
             enemy.y = -999999;
-            this.enemyMeshPool[enemy.type].push(enemy.mesh);
+            this.enemyMeshPool[enemy.shipInfo.mesh].push(enemy.mesh);
             enemy.mesh.visible = false;
             enemy.mesh = null;
             this.enemies.killAndHide(enemy);

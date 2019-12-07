@@ -1,0 +1,75 @@
+{
+	"classic": {
+		"repeat": true,
+		"shots": [
+			{
+				"angle": 90,
+				"wait": 0.25,
+				"speed": 300
+			}
+		]
+
+	},
+
+	"spray_right": {
+		"repeat": true,
+		"shots": [
+			{
+				"angle": 90,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 70,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 50,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 30,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 10,
+				"wait": 2.0,
+				"speed": 150
+			}
+		]
+	},
+	"spray_left": {
+		"repeat": true,
+		"shots": [
+			{
+				"angle": 90,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 110,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 130,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 150,
+				"wait": 0.1,
+				"speed": 150
+			},
+			{
+				"angle": 170,
+				"wait": 2.0,
+				"speed": 150
+			}
+		]
+	}
+
+}
